@@ -1,0 +1,15 @@
+offer_id,offer_name,next_step_type,eligibility_rule_summary,business_value,service_effort
+REFI,Refinance with TFS,Offer,"credit tier improved or APR gap >= 1.0 pt; 12+ months left; balance >= $8,000; no missed payments in 12 months; LTV <= 125%",Net interest income retained; prevents payoff to a competitor,Low (digital)
+EXTEND,Term extension,Offer,6+ months left; not past due 60+ days,Keeps customer current; adds interest income,Low
+EXTRA100,Extra principal payment,Self-service,Any current loan,Lower servicing cost; builds goodwill; frees capacity for next loan,Very low
+DUEDATE,Change due date,Self-service,Once per 12 months,Prevents late fees and calls,Very low
+DEFER,One-payment deferral,Follow-up (specialist),Hardship indicators; one per 12 months,Avoids delinquency and charge-off,Medium (human review)
+AUTOPAY,Enroll in autopay,Self-service,autopay = N,Fewer late payments; lower servicing cost,Very low
+PAYOFF,Payoff quote and title help,Self-service,Any loan,Smooth exit; sets up next-vehicle conversation,Very low
+TRADE,Trade-in / upgrade offer,Offer,Equity >= 0 or within rollover limits,New contract origination,Medium
+BUYOUT,Lease buyout financing,Offer,Lease ending within 120 days,Origination from lease-end customer,Low
+RENEW,Lease loyalty renewal,Offer,Lease ending within 180 days; tier A/B,Retention; new lease origination,Medium
+RETURN,Lease return guide,Self-service,Lease ending,Fewer disputes at turn-in,Low
+RELOCATE,Moving / out-of-state transfer,Follow-up,Lease or loan; moving,Retains the contract; avoids early termination,Medium
+SERVICE,Service + recall booking,Self-service,"Service overdue, open recall, or Toyota Care ending",Service margin; safety; retention,Very low
+HUMAN,Warm handoff to specialist,Follow-up,"Vulnerable flag, 2+ missed payments, low digital, or complex negative equity",Better outcomes; compliance,High

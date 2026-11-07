@@ -1,0 +1,21 @@
+customer_id,payday_day,first_name,age,city,state,occupation,annual_income,credit_tier_at_origination,credit_tier_now,other_monthly_debt,tenure_months_with_tfs,autopay,digital_engagement,preferred_channel,marketing_consent,vulnerable_flag,payment_to_income_pct,debt_to_income_pct,financial_stress_score
+C001,15,Maya,23,Richardson,TX,Junior analyst (started Sep 2026),58000,D,B,450,29,N,High,App,Y,N,13.8,23.1,34
+C002,1,Carlos,41,Garland,TX,Warehouse supervisor (hours cut 25%),52000,B,B,900,52,Y,Low,Phone,Y,Y,13.9,34.7,64
+C003,15,Priya,34,Plano,TX,Marketing manager,96000,A,A,700,34,Y,High,App,Y,N,4.6,13.3,11
+C004,30,James,46,Frisco,TX,Sales director,142000,A,A,1400,71,Y,Med,Email,Y,N,5.6,17.5,14
+C005,1,Linda,58,Mesquite,TX,School administrator,78000,B,B,300,64,N,Low,Phone,Y,N,11.5,16.1,28
+C006,1,Devon,29,Dallas,TX,UX designer,84000,B,A,800,26,Y,High,App,Y,N,7.3,18.7,16
+C007,30,Aisha,33,Irving,TX,Nurse,88000,B,B,1100,40,Y,High,App,Y,N,7.0,22.0,18
+C008,1,Tom,52,Allen,TX,Contractor,120000,C,A,1600,45,Y,Med,Email,Y,N,9.8,25.8,22
+C009,15,Sofia,27,Carrollton,TX,Dental hygienist,64000,B,B,600,31,Y,High,App,Y,N,9.3,20.6,17
+C010,30,Ryan,36,Richardson,TX,Software engineer,118000,A,A,1000,22,Y,High,App,Y,N,4.4,14.6,12
+C011,1,Grace,68,Plano,TX,Retired teacher,54000,A,A,0,96,N,Low,Phone,N,Y,13.9,13.9,36
+C012,30,Marcus,39,Dallas,TX,Restaurant owner,98000,B,B,2100,35,Y,Med,Phone,Y,N,14.9,40.6,34
+C013,1,Nina,31,Plano,TX,Physician assistant,110000,A,A,900,30,Y,High,App,Y,N,7.5,17.4,14
+C014,1,Kevin,44,Arlington,TX,Self-employed HVAC technician,61000,C,D,1300,18,N,Low,Phone,Y,Y,14.9,40.5,100
+C015,1,Elena,37,Frisco,TX,Data scientist,132000,A,A,500,41,Y,High,App,Y,N,4.8,9.4,8
+C016,15,Omar,25,Garland,TX,Rideshare driver,44000,D,D,800,15,N,Med,App,Y,Y,11.5,33.3,53
+C017,15,Hannah,43,Plano,TX,Attorney,168000,A,A,1800,58,Y,Med,Email,Y,N,4.5,17.3,14
+C018,15,Brian,30,Richardson,TX,Electrician,70000,B,B,700,28,Y,Med,App,Y,N,10.4,22.4,19
+C019,1,Tasha,40,McKinney,TX,Operations manager,90000,B,B,1900,37,Y,High,App,Y,N,13.3,38.7,33
+C020,1,Victor,48,Grand Prairie,TX,Logistics planner,86000,B,B,1200,60,Y,Med,Email,Y,N,7.5,24.3,20

@@ -1,0 +1,10 @@
+driver_id,description,assumption_text,value_usd,value_type
+VD_CALL,Avoided contact-center call,$9.50 per call avoided,9.5,Cost reduction
+VD_DIGITAL,Cost of digital self-service session,$0.60,0.6,Cost reduction
+VD_REFI,Retained loan via refinance (vs. competitor payoff),$420 expected value per retained loan,420.0,Retention
+VD_ORIG,New contract origination (net margin),"$1,800 per contract",1800.0,Revenue
+VD_BUYOUT,Lease buyout financing,"$1,100 per contract",1100.0,Revenue
+VD_SERVICE,Service visit at Toyota dealer (finance-linked margin),$85 per visit,85.0,Revenue
+VD_AUTOPAY,Autopay enrollment servicing saving,$18 per year,18.0,Cost reduction
+VD_CURE,Delinquency cure (avoided charge-off expected loss),"$1,250 per cured account",1250.0,Risk reduction
+VD_CLEAR,Cleaner lease return (dispute and remarketing savings),$150,150.0,Cost reduction

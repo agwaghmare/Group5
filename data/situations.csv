@@ -1,0 +1,21 @@
+situation_id,customer_id,customer_says,context_summary
+S001,C001,I just started my first real job and my credit score is way better than when I bought my RAV4. Am I overpaying?,Graduated UTD; new salary; credit up since purchase
+S002,C002,My hours got cut this month and I was late on last month's payment. I really want to keep my Camry. What should I do?,Hours cut this month; one late payment last month
+S003,C003,"My Corolla Cross lease ends in 3 months and I've driven a lot more than I planned. What happens now, and what's cheapest?",Lease ends in 3 months; driving more than allowed
+S004,C004,I want a Tundra. My Tacoma is in great shape. How do I do this without losing money?,Wants a Tundra; truck has equity
+S005,C005,I only have 6 payments left on my Highlander. Anything I should know? I still mail a check.,6 payments left; still mails a check
+S006,C006,"My RAV4 Hybrid lease ends in 5 months and I barely drove it. Should I turn it in, buy it, or get something new?",Lease ends in 5 months; low mileage; open to a newer hybrid
+S007,C007,We're having a baby and my Prius is too small. Can I afford to move to a Sienna?,Expecting a baby; needs more room
+S008,C008,My income and credit are better than when I financed my Tundra. That 10.9% rate bugs me. Can I lower it?,Income up and credit up; interest rate feels high
+S009,C009,I got a service reminder and I think my Toyota Care is about to run out. What do I need to do?,Service overdue; Toyota Care ending; open recall
+S010,C010,I'm moving to Denver in 2 months and I have a Camry lease. What are my options?,Relocating to Denver in 2 months
+S011,C011,I have 10 payments left on my Avalon and I plan to keep the car. I'd like to talk to a person. What's next?,Prefers phone; 10 payments left; wants to keep car
+S012,C012,I want to sell my Sequoia but I owe more than it's worth. What are my realistic options?,Wants to sell; owes more than car is worth
+S013,C013,My bZ4X lease ends in 6 months. Should I stay electric or switch to a hybrid?,EV lease ends in 6 months; wondering about EV vs hybrid
+S014,C014,I've missed two payments because work is slow. I can't lose my truck. Please help.,Two missed payments; stressed; wants to keep truck
+S015,C015,I have extra cash every month. What's the smartest way to use it on my Camry Hybrid loan?,Has extra cash each month; wants to be debt-free sooner
+S016,C016,I owe more than my Corolla is worth and my rate is 17.9%. Is there anything I can do?,84-month used loan; owes more than value; checking options
+S017,C017,My Highlander lease ends in 2 months and I want to keep it. What does buying it cost?,Lease ends in 2 months; wants to keep the car
+S018,C018,My payment is due the 1st but I get paid on the 15th and I keep getting overdraft fees. Can this be fixed?,Paid on the 1st but gets paid on the 15th; overdraft fees
+S019,C019,Insurance and gas are up and my Grand Highlander payment feels heavy. What can I do without making it worse later?,Budget squeeze; insurance and gas up; payment feels high
+S020,C020,I have 8 payments left on my Camry. Should I trade it in early for a new one or wait?,8 payments left; tempted to trade early for a new model
