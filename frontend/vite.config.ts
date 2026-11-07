@@ -9,10 +9,24 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
+// The Learn backend (FastAPI, ./backend) runs separately. In dev, /api/* is proxied to it so the
+// browser talks to one origin. Override the target with LEARN_API_URL when the API uses another port.
+const learnApi = process.env["LEARN_API_URL"] ?? "http://127.0.0.1:8010";
+
 export default defineConfig({
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
+  },
+  vite: {
+    server: {
+      proxy: {
+        "/api": {
+          target: learnApi,
+          rewrite: (path: string) => path.replace(/^\/api/, ""),
+        },
+      },
+    },
   },
 });

@@ -1,1 +1,16 @@
 data/DumpStack.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+backend/storage/
+
+# Node
+node_modules/
+frontend/.output/
+frontend/dist/
+
+# Local tooling
+.run/
+.vscode/
