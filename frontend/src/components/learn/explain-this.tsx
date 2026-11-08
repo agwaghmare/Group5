@@ -7,31 +7,28 @@ import { ExplanationCard } from "@/components/learn/explanation-card";
 import { learnApi, learnUserId, type ExplainResult } from "@/lib/learn-api";
 
 /**
- * "Learn from the current decision": pick a Toyota pack customer (or a tracker user)
- * and click a question such as "Explain this APR" or "What is residual value?".
- * Numbers come from that synthetic contract; nothing here is an offer.
+ * "Learn from the current decision": pick a finance tracker user
+ * and click a question such as "Explain APY" or "What is credit utilization?".
+ * Numbers come from the synthetic tracker; nothing here is an offer.
  */
 export function ExplainThis({
   onOpenLesson,
 }: {
   onOpenLesson: (lessonId: string) => void;
 }) {
-  const [customerId, setCustomerId] = useState("C001");
-  const [trackerId, setTrackerId] = useState("");
+  const [trackerId, setTrackerId] = useState("1000");
   const [applied, setApplied] = useState<{
-    customer: string | undefined;
     tracker: number | undefined;
   }>({
-    customer: "C001",
-    tracker: undefined,
+    tracker: 1000,
   });
   const [result, setResult] = useState<ExplainResult | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const prompts = useQuery({
-    queryKey: ["learn", "prompts", applied.customer, applied.tracker],
-    queryFn: () => learnApi.prompts(applied.customer, applied.tracker),
+    queryKey: ["learn", "prompts", applied.tracker],
+    queryFn: () => learnApi.prompts(undefined, applied.tracker),
   });
 
   const ask = async (questionId: string) => {
@@ -41,7 +38,6 @@ export function ExplainThis({
       setResult(
         await learnApi.explain({
           question_id: questionId,
-          customer_id: applied.customer,
           tracker_user_id: applied.tracker,
           user_id: learnUserId(),
         }),
@@ -56,7 +52,6 @@ export function ExplainThis({
   const apply = () => {
     const tracker = trackerId.trim() ? Number(trackerId) : undefined;
     setApplied({
-      customer: customerId.trim() || undefined,
       tracker: Number.isFinite(tracker) ? tracker : undefined,
     });
     setResult(null);
@@ -71,21 +66,9 @@ export function ExplainThis({
           </p>
           <label
             className="mb-1 block text-xs text-muted-foreground"
-            htmlFor="learn-customer"
-          >
-            Toyota pack customer (C001–C020)
-          </label>
-          <Input
-            id="learn-customer"
-            value={customerId}
-            onChange={(e) => setCustomerId(e.target.value.toUpperCase())}
-            placeholder="C001"
-          />
-          <label
-            className="mb-1 mt-3 block text-xs text-muted-foreground"
             htmlFor="learn-tracker"
           >
-            Finance tracker user (1000–1499, optional)
+            Finance tracker user (1000–1499)
           </label>
           <Input
             id="learn-tracker"
@@ -136,8 +119,8 @@ export function ExplainThis({
         {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
         {!result && !error && (
           <div className="flex h-full min-h-[280px] items-center justify-center rounded-2xl border border-dashed border-border p-8 text-center text-muted-foreground">
-            Pick a question on the left. The answer uses that customer's
-            synthetic contract, in plain words first.
+            Pick a question on the left. The answer uses that user's
+            synthetic tracker data, in plain words first.
           </div>
         )}
         {result && (
@@ -162,7 +145,6 @@ export function ExplainThis({
               onGoDeeper={async () => {
                 const deep = await learnApi.explain({
                   question_id: result.question_id,
-                  customer_id: applied.customer,
                   tracker_user_id: applied.tracker,
                   go_deeper: true,
                 });
@@ -176,7 +158,6 @@ export function ExplainThis({
                 </summary>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {Object.entries({
-                    ...result.your_numbers.contract,
                     ...result.your_numbers.tracker,
                   }).map(([k, v]) => (
                     <Badge key={k} variant="secondary" className="font-normal">

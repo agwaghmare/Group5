@@ -18,7 +18,7 @@ TOPICS: list[dict] = [
     {"id": "stock_markets", "title": "Stock markets", "summary": "Prices, dividends, and diversification."},
     {"id": "cds_iras", "title": "CDs and IRAs", "summary": "Locked-in yields and tax-advantaged retirement accounts."},
     {"id": "mortgages", "title": "Mortgages", "summary": "Home loans, equity, and long amortization."},
-    {"id": "automotive_finance", "title": "Automotive finance", "summary": "Auto loans, payoff, and vehicle value. Uses the Toyota data pack for a customer's contract."},
+    {"id": "automotive_finance", "title": "Automotive finance", "summary": "Auto loans, payoff, and vehicle value."},
     {"id": "lease_vs_buy", "title": "Lease versus buy", "summary": "Residual value, money factor, and what you own at the end."},
     {"id": "interest_rate_risk", "title": "Interest-rate risk", "summary": "What happens to payments and bond prices when rates move."},
     {"id": "quant_fundamentals", "title": "Quantitative finance fundamentals", "summary": "Time value of money, expected value, and spread of outcomes."},
@@ -639,8 +639,8 @@ LESSONS: list[dict] = [
         "prerequisites": ["amort-payment"],
         "explanation": _levels(
             "An auto loan is a fixed set of payments on the amount you financed. The car is collateral. The APR is the yearly rate used to compute each month's interest.",
-            "Amount financed is not always the sticker price. It can include taxes, fees, and any negative equity rolled in from a previous car, minus your down payment and rebates. Interest this month is the unpaid balance times APR/12. A payoff quote is what the lender will accept to close the loan today. It can be a bit higher than the balance on the statement because interest has accrued since the last payment. For a specific Toyota Financial Services contract, use that customer's row in the data pack. Do not invent a second APR.",
-            "Amount financed P = vehicle price + tax + fees + rolled negative equity − down payment − rebates. Then M and the split (I_t, Π_t) follow the amortization lesson with the contract APR. Payoff at a date between due dates is approximately B plus accrued interest B · r · (days/30), plus any contractual fee. The data pack's payoff_quote is the figure to teach from for that customer; the formula explains why it can exceed current_balance. Credit tier maps to the synthetic rate sheet, which is labeled as made-up hackathon pricing, not a live TFS offer.",
+            "Amount financed is not always the sticker price. It can include taxes, fees, and any negative equity rolled in from a previous car, minus your down payment and rebates. Interest this month is the unpaid balance times APR/12. A payoff quote is what the lender will accept to close the loan today. It can be a bit higher than the balance on the statement because interest has accrued since the last payment.",
+            "Amount financed P = vehicle price + tax + fees + rolled negative equity − down payment − rebates. Then M and the split (I_t, Π_t) follow the amortization lesson with the contract APR. Payoff at a date between due dates is approximately B plus accrued interest B · r · (days/30), plus any contractual fee. The formula explains why the payoff can exceed the current balance shown on a statement.",
         ),
         "example": {"title": "A $24,000 balance at 7.9% with 48 months left", "kind": "loan", "principal": 24000, "apr": 7.9, "months": 48},
         "quiz": [
@@ -673,7 +673,7 @@ LESSONS: list[dict] = [
         "prerequisites": ["auto-loan"],
         "explanation": _levels(
             "If the car is worth more than you owe, you have equity. If you owe more than it is worth, you have negative equity.",
-            "Cars usually depreciate: the market value falls as they age and gain miles, fastest in the early years. A small down payment and a long term can leave the balance above the value for a while. That gap matters if you want to trade in or if the car is totaled. Insurance that only covers market value would not cover a bigger loan payoff unless you bought extra coverage for that gap. The data pack's est_equity for a loan is market value minus current balance. A dealer trade uses the payoff, which can be a little higher.",
+            "Cars usually depreciate: the market value falls as they age and gain miles, fastest in the early years. A small down payment and a long term can leave the balance above the value for a while. That gap matters if you want to trade in or if the car is totaled. Insurance that only covers market value would not cover a bigger loan payoff unless you bought extra coverage for that gap. Vehicle equity for a loan is market value minus current balance. A dealer trade uses the payoff, which can be a little higher.",
             "Equity versus the statement balance is E_bal = V − B. Equity versus getting out today is E_pay = V − payoff. The pack reports est_equity = E_bal. Negative equity E < 0 rolled into the next contract raises the next amount financed, so the new loan starts underwater by that amount before any new depreciation. Depreciation over a holding period is V_0 − V_t (using the purchase price as V_0). It is a change in the asset, while principal paydown is a change in the liability. Equity rises when paydown outruns depreciation.",
         ),
         "example": {"title": "A $31,500 vehicle now worth $22,700", "kind": "depreciation", "price": 31500, "market": 22700, "months_owned": 29},

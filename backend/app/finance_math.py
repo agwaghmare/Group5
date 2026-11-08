@@ -8,13 +8,6 @@ Monthly loan payment (ordinary annuity):
 
 APY from a nominal rate compounded n times a year:
     APY = (1 + nominal / n)^n - 1
-
-Lease payment (standard money-factor form, taxes excluded):
-    depreciation = (cap_cost - residual) / term
-    rent_charge = (cap_cost + residual) * money_factor
-    payment = depreciation + rent_charge
-
-Approximate APR quoted from a money factor: APR ≈ money_factor * 2400.
 """
 
 from __future__ import annotations
@@ -133,27 +126,6 @@ def annuity_future_value(annual_contribution: float, annual_yield: float, years:
     return annual_contribution * ((1.0 + r) ** years - 1.0) / r
 
 
-def money_factor_to_apr(money_factor: float) -> float:
-    """Industry approximation: APR percent ≈ money factor × 2400."""
-    return money_factor * 2400.0
-
-
-def lease_parts(cap_cost: float, residual: float, term_months: int, money_factor: float) -> tuple[float, float, float]:
-    if term_months <= 0:
-        return 0.0, 0.0, 0.0
-    depreciation = (cap_cost - residual) / term_months
-    rent = (cap_cost + residual) * money_factor
-    return depreciation, rent, depreciation + rent
-
-
-def loan_equity(market_value: float, balance: float) -> float:
-    return market_value - balance
-
-
-def lease_equity(market_value: float, residual: float, buyout_fee: float = 350.0) -> float:
-    return market_value - (residual + buyout_fee)
-
-
 def simple_return(start_price: float, end_price: float, dividend: float = 0.0) -> float:
     return (end_price + dividend - start_price) / start_price
 
@@ -175,3 +147,17 @@ def expected_value(outcomes: list[tuple[float, float]]) -> tuple[float, float]:
 def modified_duration_price_change(duration_years: float, yield_change_percent_points: float) -> float:
     """Approximate fractional price change: -duration × Δyield."""
     return -duration_years * (yield_change_percent_points / 100.0)
+
+
+def money_factor_to_apr(factor: float) -> float:
+    """Industry approximation: APR ≈ money_factor × 2400."""
+    return factor * 2400.0
+
+
+def lease_parts(
+    cap_cost: float, residual: float, term_months: int, money_factor: float
+) -> tuple[float, float, float]:
+    """Return (depreciation, rent_charge, base_payment) for a lease."""
+    dep = (cap_cost - residual) / term_months if term_months else 0.0
+    rent = (cap_cost + residual) * money_factor
+    return dep, rent, dep + rent

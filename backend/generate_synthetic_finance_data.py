@@ -448,7 +448,7 @@ def validate(df: pd.DataFrame) -> None:
 
 
 if __name__ == "__main__":
-    # Vehicle / TFS fields live in data/vehicles.csv + the Toyota next-move pack — not here.
+    # PNC personal-finance tracker data only.
     out = r"c:\Group5\data\personal_finance_tracker_dataset.csv"
     df = generate()
     validate(df)

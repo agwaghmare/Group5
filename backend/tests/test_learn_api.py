@@ -130,47 +130,6 @@ def test_scenario_grade():
     assert submitted.json()["score"] == 1
 
 
-def test_loan_decision_explanations_use_toyota_numbers():
-    apr = client.post("/learn/context/explain", json={"question_id": "explain-apr", "customer_id": "C001", "user_id": "c001"})
-    assert apr.status_code == 200
-    explanation = apr.json()["explanation"]
-    text = _text(explanation)
-    assert "annual percentage rate" in explanation["one_sentence"].lower()
-    assert explanation["worked_example"]["label"] == "your numbers"
-    assert explanation["go_deeper"]["expanded"] is False
-    assert "12.90%" in text
-    assert "$22,920.95" in text
-    refi = client.post("/learn/context/explain", json={"question": "Why does refinancing change interest?", "customer_id": "C001"})
-    refi_body = refi.json()["explanation"]
-    assert "analogy" in refi_body
-    assert "what_this_means_for_you" in refi_body
-    assert "7.70%" in _text(refi_body)
-    equity = client.post("/learn/context/explain", json={"question": "What is equity?", "customer_id": "C001"})
-    assert "220.95" in _text(equity.json()["explanation"])
-    dep = client.post("/learn/context/explain", json={"question": "Why does depreciation matter?", "customer_id": "C001"})
-    assert "8,800.00" in _text(dep.json()["explanation"])
-    saved = client.get("/learn/progress/c001").json()
-    assert "explain-apr" in saved["viewed_questions"]
-
-
-def test_lease_decision_uses_residual_not_a_fake_apr():
-    prompts = client.get("/learn/context/prompts", params={"customer_id": "C003"}).json()["prompts"]
-    labels = {row["id"]: row for row in prompts}
-    assert labels["residual-value"]["highlighted"] is True
-    assert labels["explain-apr"]["label"] == "Explain this money factor"
-    residual = client.post("/learn/context/explain", json={"question": "What is residual value?", "customer_id": "C003"})
-    text = _text(residual.json()["explanation"])
-    assert "$16,320.00" in text
-    assert "279.56" in text or "279.55" in text
-    loan_residual = client.post("/learn/context/explain", json={"question_id": "residual-value", "customer_id": "C001"})
-    assert "loan" in loan_residual.json()["explanation"]["one_sentence"].lower()
-
-
-def test_vulnerable_customer_is_not_sold_an_offer():
-    body = client.post("/learn/context/explain", json={"question_id": "explain-apr", "customer_id": "C002"}).json()
-    assert "not an offer" in body["explanation"]["safe_next_step"].lower()
-
-
 def test_tracker_apy_and_all_questions_render():
     body = client.post(
         "/learn/agent",
@@ -180,7 +139,7 @@ def test_tracker_apy_and_all_questions_render():
     assert body["question_id"] == "explain-apy"
     assert "annual percentage yield" in body["explanation"]["one_sentence"].lower()
     for question_id in QUESTION_INDEX:
-        result = client.post("/learn/context/explain", json={"question_id": question_id, "customer_id": "C001", "go_deeper": True})
+        result = client.post("/learn/context/explain", json={"question_id": question_id, "tracker_user_id": 1000, "go_deeper": True})
         assert result.status_code == 200
         explanation = result.json()["explanation"]
         assert explanation["one_sentence"].strip()
@@ -195,7 +154,7 @@ def test_question_router_does_not_invent_a_formula():
     body = client.post("/learn/agent", json={"question": "What is the weather on Mars?"}).json()
     assert body["matched"] is False
     assert body["prompts"]
-    assert match_question("How do I compare lease and buy?", None).id == "lease-vs-buy"
+    assert match_question("What is credit utilization?", None).id == "credit-utilization"
 
 
 def test_worked_refi_example_matches_formula():

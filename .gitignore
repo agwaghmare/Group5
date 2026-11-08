@@ -1,5 +1,20 @@
 data/DumpStack.log
 
+# Toyota / TFS data files (removed from project)
+data/customers.csv
+data/vehicles.csv
+data/accounts.csv
+data/situations.csv
+data/option_scenarios.csv
+data/offers_catalog.csv
+data/rate_sheet.csv
+data/value_drivers.csv
+data/golden_answers.csv
+data/customer_profiles.json
+data/toyota_next_move_data_pack.xlsx
+data/starter_system_prompt.txt
+data/README.md
+
 # Python
 __pycache__/
 *.pyc
