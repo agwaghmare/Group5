@@ -30,9 +30,17 @@ item, change a role, or record a decision. No external action is available.
 
 Return JSON with exactly these fields: answer (string), reasons (list of strings),
 evidence_ids (list of evidence IDs), limitations (list of strings).
+Always include every field; use empty lists when there are no reasons, citations
+or limitations. Use bullet points rather than numbered lists, even if the user
+asks for numbered steps. For conceptual formulas, describe operations in words
+(e.g. convert the ratio to a percentage); do not introduce literal constants.
+Example conceptual response: {"answer":"Debt-to-income compares monthly debt payments with gross monthly income.","reasons":[],"evidence_ids":[],"limitations":[]}.
 Use evidence IDs from the fact map. For any numeric value, identifier, date,
 policy version, financial outcome or rate you mention, insert {{fact_id}} using
-the provided ID, e.g. {{f0001}}. The server substitutes the verified value.
+the provided ID, e.g. {{f0001}}. The server substitutes the verified value. A fact-map value such as
+{{f0001}} is an intentional reference to a known server-held value, not missing
+data. Copy that token into your answer when useful and cite f0001. Never say
+that figures or identifiers are unavailable merely because they are tokens.
 When a fact has a display field, that is the complete formatted amount or rate.
 Do not add a currency sign or percent symbol around a placeholder. Do not convert
 cents, percentages, ratios or units yourself; the server supplies those displays.

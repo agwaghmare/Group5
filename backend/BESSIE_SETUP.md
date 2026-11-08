@@ -89,11 +89,11 @@ session. It can be reintroduced later with server verification and account mappi
 
 ## Bessie's prompt and request
 
-Prompt: `app/agents/prompts/bessie.md`, version bessie-v2.
+Prompt: `app/agents/prompts/bessie.md`, version bessie-v3.
 Adapter: `app/agents/bessie.py`. The existing `/staff/assistant` endpoint is live.
 Requests default to `agent: "bessie"`; Bessie keeps her identity on every tab.
 The explicit staff Explain This panel uses `agent: "wilbur"` with `learn.explain`
-and its separate `app/agents/prompts/wilbur.md` prompt (wilbur-v1), inheriting staff
+and its separate `app/agents/prompts/wilbur.md` prompt (wilbur-v2), inheriting staff
 permissions. Customer Amelia and customer Learn's existing deterministic tools
 are not silently replaced by this integration.
 
@@ -116,6 +116,18 @@ For research, select a prospect, complete the purpose gate and run the policy
 engine before asking Bessie about that run. Code computes; Bessie explains.
 
 NVIDIA receives the question, role, feature and a fact map of authorized evidence.
+Numerical values and identifiers containing digits are sent as fact placeholders;
+original values and formatted financial amounts stay on the server. Code-computed
+outcomes and rule statuses remain available for qualitative explanation. Agent
+instructions and context share one system message to keep their ordering explicit.
+The API request uses strict `response_format: json_schema` to require all four
+response fields, rather than accepting arbitrary JSON. Prompts use bullets instead
+of numbered steps and describe conceptual formulas in words. This prevents ordinary
+step requests from introducing literal numbers that the evidence validator rejects.
+If a completed draft fails validation, the adapter regenerates once with fixed
+formatting instructions within the same time budget. It never displays or resends
+the invalid draft; a second failure remains an error. Refusals, incomplete output,
+provider failures and timeouts are not retried through this formatting path.
 It never receives .env, account passwords or the API key as prompt content. No
 unfiltered customer table, excluded credit attributes or cross-role records are
 sent. Individual case context must already be consented and assigned.
@@ -176,3 +188,16 @@ with synthetic workspace context used the configured NVIDIA key and
 evidence validation. No account credentials or customer records were sent. Tests
 also check short/full model names, role isolation, separate agent prompts,
 unknown citations, timeouts, refusal/truncation and hidden reasoning content.
+
+Validation regression: "What is debt-to-income? Give me 3 steps." reproduced an
+answer-only JSON object with unsupported literal numbers before this fix. The
+same synthetic question passed a live NVIDIA check after schema enforcement and
+prompt clarification. Financial numbers still require authorized fact placeholders;
+neither missing citations nor invented figures are accepted. The user's Research
+question, "what does this research mean?", also reproduced raw-number failures.
+After tokenizing numeric context, a live check using a generated synthetic run
+passed and explained the recorded outcome. Regression tests verify server-only
+money rendering, bounded regeneration and refusal to return repeated invalid drafts.
+Final validation-fix checks: 93 backend tests passed, 195 archived tests skipped;
+backend lint passed. The final live synthetic research reply passed validation
+and included a server-rendered evidence citation.
