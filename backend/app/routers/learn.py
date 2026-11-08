@@ -137,12 +137,21 @@ def lessons(topic_id: str | None = None, user_id: str | None = None) -> dict:
     }
 
 
+def _reject_if_locked(lesson: dict, progress: dict | None) -> None:
+    if _lesson_status(lesson, progress) == "locked":
+        raise HTTPException(
+            status_code=403,
+            detail="This lesson is locked until its prerequisites are complete.",
+        )
+
+
 @router.get("/lessons/{lesson_id}")
 def lesson_detail(lesson_id: str, user_id: str | None = None, go_deeper: bool = False) -> dict:
     lesson = LESSON_INDEX.get(lesson_id)
     if lesson is None:
         raise HTTPException(status_code=404, detail="Unknown lesson")
     progress = get_progress(user_id) if user_id else None
+    _reject_if_locked(lesson, progress)
     payload = _public_lesson(lesson, progress, go_deeper=go_deeper)
     payload["view"] = "lessons"
     return payload
@@ -154,6 +163,7 @@ def lesson_go_deeper(lesson_id: str, user_id: str | None = None) -> dict:
     if lesson is None:
         raise HTTPException(status_code=404, detail="Unknown lesson")
     progress = get_progress(user_id) if user_id else None
+    _reject_if_locked(lesson, progress)
     payload = _public_lesson(lesson, progress, go_deeper=True)
     payload["view"] = "lessons"
     return payload["explanation"]["go_deeper"]
@@ -165,6 +175,8 @@ def submit_check(lesson_id: str, body: AnswerSubmission) -> dict:
     lesson = LESSON_INDEX.get(lesson_id)
     if lesson is None:
         raise HTTPException(status_code=404, detail="Unknown lesson")
+    progress = get_progress(body.user_id)
+    _reject_if_locked(lesson, progress)
     graded = _grade(lesson["quiz"], body.answers)
     progress = record_quiz(body.user_id, lesson_id, graded["correct"], graded["total"])
     return {"control": "check_my_understanding", "lesson_id": lesson_id, **graded, "progress": progress}
@@ -289,6 +301,29 @@ def context_explain(body: ExplainRequest) -> dict:
         body.tracker_user_id,
         go_deeper=body.go_deeper,
     )
+    if not result.get("matched") and body.lesson_id:
+        lesson = LESSON_INDEX.get(body.lesson_id)
+        if lesson is None:
+            raise HTTPException(status_code=404, detail="Unknown lesson")
+        progress = get_progress(body.user_id) if body.user_id else None
+        _reject_if_locked(lesson, progress)
+        example = render_example(lesson["example"])
+        result = {
+            "matched": True,
+            "lesson_id": lesson["id"],
+            "lesson_title": lesson["title"],
+            "label": body.question or lesson["title"],
+            "explanation": present_explanation(
+                lesson["id"],
+                lesson["explanation"],
+                example=example,
+                number_source="toy",
+                go_deeper=body.go_deeper,
+                go_deeper_path=f"/learn/lessons/{lesson['id']}/go-deeper",
+            ),
+            "notes": ["Answered from this lesson."],
+            "prompts": result.get("prompts", []),
+        }
     if body.user_id and result.get("matched") and result.get("question_id"):
         record_view(body.user_id, result["question_id"])
     return result

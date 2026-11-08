@@ -21,4 +21,5 @@ class ExplainRequest(BaseModel):
     customer_id: str | None = None
     tracker_user_id: int | None = None
     user_id: str | None = None
+    lesson_id: str | None = None
     go_deeper: bool = False

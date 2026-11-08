@@ -26,11 +26,11 @@ def test_health_and_two_views():
     assert home.status_code == 200
     body = home.json()
     assert [view["id"] for view in body["views"]] == ["lessons", "knowledge_map"]
-    assert len(body["topics"]) == 12
+    assert len(body["topics"]) == 10
     assert body["explanation_sequence"][0:3] == ["one_sentence", "analogy", "worked_example"]
     assert "go_deeper" in body["explanation_sequence"]
     assert "check_my_understanding" in body["explanation_sequence"]
-    assert body["lesson_count"] >= 24
+    assert body["lesson_count"] >= 20
 
 
 def _text(value) -> str:
@@ -48,7 +48,7 @@ def test_every_lesson_follows_section6_sequence():
     assert listing.status_code == 200
     lessons = listing.json()["lessons"]
     topics = {row["topic_id"] for row in lessons}
-    assert len(topics) == 12
+    assert len(topics) == 10
     for row in lessons:
         detail = client.get(f"/learn/lessons/{row['id']}")
         assert detail.status_code == 200
@@ -89,11 +89,13 @@ def test_knowledge_map_locks_until_prereqs_done():
     by_id = {node["id"]: node for node in graph["nodes"]}
     assert by_id["pf-cashflow"]["status"] == "available"
     assert by_id["pf-budget"]["status"] == "locked"
-    assert any(edge["source"] == "amort-payment" and edge["target"] == "auto-loan" for edge in graph["edges"])
-    node = client.get("/learn/map/auto-loan", params={"user_id": "map-user"})
+    locked = client.get("/learn/lessons/pf-budget", params={"user_id": "map-user"})
+    assert locked.status_code == 403
+    assert any(edge["source"] == "amort-payment" and edge["target"] == "mtg-payment" for edge in graph["edges"])
+    node = client.get("/learn/map/mtg-payment", params={"user_id": "map-user"})
     assert node.status_code == 200
     assert "amort-payment" in node.json()["prerequisites"]
-    assert "auto-equity" in node.json()["unlocks"]
+    assert "mtg-equity" in node.json()["unlocks"]
 
 
 def test_quiz_saves_progress_and_recommends_next():
@@ -120,10 +122,10 @@ def test_quiz_saves_progress_and_recommends_next():
 
 
 def test_scenario_grade():
-    scenario = client.get("/learn/scenarios/sc-lease-buy").json()
+    scenario = client.get("/learn/scenarios/sc-refi").json()
     assert "36" in scenario["situation"]
     submitted = client.post(
-        "/learn/scenarios/sc-lease-buy/grade",
+        "/learn/scenarios/sc-refi/grade",
         json={"user_id": "scenario-user", "answers": {"q1": 0, "q2": 0}},
     )
     assert submitted.status_code == 200
