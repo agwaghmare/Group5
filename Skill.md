@@ -65,15 +65,15 @@ The built landing page has a bottom-left wheel with tabs. The selected tab shows
 | 2 | `finance` | Finance | `personal_finance` (Amelia) | `customer` | PNC customer experience; first agent tab (primary target) |
 | 3 | `research` | Research | `staff_copilot` (Bessie) | `credit_analyst` | Prospects, credit research workbench, decision log |
 | 4 | `cases` | Cases | `staff_copilot` (Bessie) | `service_specialist` | Handoff queue |
-| 5 | `portfolio` | Portfolio | `staff_copilot` (Bessie) | `portfolio_manager`, `marketing_analyst` | Aggregates, business impact, campaigns |
+| 5 | `portfolio` | Portfolio | `staff_copilot` (Bessie) | `portfolio_manager`, `marketing_analyst` | Assigned-client portfolio risk, simulated rebalancing, aggregates and campaigns |
 | 6 | `compliance` | Compliance | `staff_copilot` (Bessie) | `compliance_analyst`, `auditor` | Fairness monitor, anomaly queue, audit log |
 | 7 | `benefits` | Benefits | `staff_copilot` (Bessie) | every staff role (`benefits_admin` gets the admin view) | Employee discounts |
-| 8 | `learn` | Learn | `learn` (Wilbur) | every role except `credit_analyst` | Other staff see it; Wilbur runs with the invoking role's permissions. Credit analysts do not get Learn or Wilbur. |
-| 9 | `activity` | Activity | none | `credit_analyst` | Saved in-progress decisions and the human decision log |
+| 8 | `learn` | Learn | `learn` (Wilbur) | every role except `credit_analyst` and `portfolio_manager` | Other staff see it; Wilbur runs with the invoking role's permissions. Credit analysts and portfolio managers use Activity instead of Learn or Wilbur. |
+| 9 | `activity` | Activity | none | `credit_analyst`, `portfolio_manager` | Role-specific decisions or portfolio assignment, assessment and rebalance activity |
 
 **The wheel is role-filtered.** The registry lists every tab, but a signed-in role sees only the tabs its role may use (Section 3.5), and the wheel is drawn from that filtered list. **Display numbers and eyebrows are positional:** the `Order` column only sorts tabs. The number on an unselected segment, and the eyebrow (`0N — LABEL`), use the tab's position in the **visible** list (a Credit Analyst sees `01 — HOME`, `02 — RESEARCH`, `03 — BENEFITS`, `04 — ACTIVITY`). Segment angle is 360 / N for N visible tabs. Never hard-code segment counts.
 
-**Default customer wheel order: Home, Finance, Learn.** Staff wheel order: Home, the role's workspace tab, Benefits, then Learn. A credit analyst ends with Activity instead of Learn. Derive segment order, numbers, snap order, and the default landing target from this table and the role matrix (3.5), not from literals.
+**Default customer wheel order: Home, Finance, Learn.** Staff wheel order: Home, the role's workspace tab, Benefits, then Learn. Credit analysts and portfolio managers end with Activity instead of Learn. Derive segment order, numbers, snap order, and the default landing target from this table and the role matrix (3.5), not from literals.
 
 **Hiding is not security.** Navigating to a tab the role may not use (URL, stored state, or a stale `activeSection`) redirects to Home and logs the attempt, and the server independently refuses the data (Section 9.5).
 
@@ -120,6 +120,19 @@ Status column must be filled from the repo audit (`verify`), never assumed.
 
 **Staff Copilot: Bessie (PNC employees)**
 
+**Approved portfolio workspace extension:** Portfolio / Risk Managers may self-assign
+unassigned tracker clients and read the minimum financial context, holdings,
+assessments and history of their assigned clients. They may create and explicitly
+approve simulated rebalance proposals; no brokerage orders are sent. Marketing
+remains aggregate-only. Risk/return averages require five current client assessments; own assigned-client workflow counts remain directly visible. Bessie
+explains server-computed evidence; she cannot assign clients or approve trades.
+Three disjoint allocation buckets (domestic stocks, domestic bonds, foreign-market
+holdings) sum to one, with asset class/geography recorded separately. Financial
+risk capacity, stated tolerance and current exposure are separate. Reproducible
+synthetic holdings, questionnaire answers and market history must be labeled;
+missing actual market/trade history must never be presented as real performance.
+Preserve client finances and existing employee workflows when initializing tables.
+
 Every staff feature carries a `Roles` list. A feature appears in a role's picker only if the role is listed, and the server enforces the same list (Sections 3.5 and 9.5). `org` is a session attribute, not a feature property. The Specialist column holds internal module names (trace labels only).
 
 | Feature ID | Name | Specialist | Roles | Pri | What it does |
@@ -129,7 +142,7 @@ Every staff feature carries a `Roles` list. A feature appears in a role's picker
 | `staff.creditresearch` | Credit Research Workbench | Research | `credit_analyst` | P0 | Evaluates versioned, synthetic policy rules for a prospect and requested product; returns a recommended review outcome, rule-by-rule evidence, strengths and concerns, missing inputs, an indicative pricing tier, and "what would change the outcome" (Section 7.5). PNC: personal loan, credit card |
 | `staff.decision` | Human Decision Log | Research | `credit_analyst` (write); `compliance_analyst` (review, read-only) | P0 | Records the human decision, rationale, and any override of the engine; an in-progress decision can be saved and reopened; nothing is sent externally |
 | `staff.cases` | Handoff Queue | Cases | `service_specialist` | P0 | Cases created by customer-agent handoffs with consented context only; Bessie prepares a grounded case brief; no upsell on protected customers (Section 7.7) |
-| `staff.portfolio` | Portfolio View | Portfolio | `portfolio_manager`; `marketing_analyst` (campaign results only) | P0 | Aggregate views with a minimum group size; research funnel and override rate; PNC aggregates from the 30-customer dataset |
+| `staff.portfolio` | Portfolio View | Portfolio | `portfolio_manager`; `marketing_analyst` (campaign results only) | P0 | Portfolio managers: assigned-client holdings, risk capacity/tolerance, modeled performance and approved simulated rebalances; aggregate minimum group size five. Marketing: campaign aggregates only |
 | `staff.benefits` | Employee Benefits | Benefits | every staff role; `benefits_admin` (admin) | P0 | Discounts on merchandise, service, accessories, and parts; tenure tiers, annual cap, simulated redemption, ledger (Section 7.6) |
 | `staff.audit` | Access Audit | Compliance | `auditor`, `compliance_analyst` | P0 | Append-only log of sensitive reads, research runs, decisions, denials, and break-glass use; searchable and filterable |
 | `staff.fairness` | Fair-Lending Monitor | Compliance | `compliance_analyst` | P1 | Outcome-rate comparison across synthetic group labels, invariance-test results, and the override review queue (illustrative metrics, not legal standards) |
@@ -144,7 +157,7 @@ Every staff feature carries a `Roles` list. A feature appears in a role's picker
 - Default to **no data sharing across agents**. Sharing needs an explicit, revocable user opt-in.
 - **Role gate:** before any tool call the router checks the session's role against the feature's `Roles` list and the tool's data scope. A denied call returns an honest "not available for your role" message and is written to the audit log. Role and employee ID come from the authenticated session, never from user text.
 - **Customer-to-staff handoff:** when a customer agent (the Finance coach) hands a case to a human, it creates a `cases` record holding only the context the customer consented to share. Bessie and the Service Specialist see that record and nothing more; staff never read a customer's live agent conversation.
-- **Wilbur on staff screens** runs with the invoking role's permissions and receives only the rule, metric, and numbers that user can already see. Credit analysts do not have Wilbur; Bessie is their only assistant.
+- **Wilbur on staff screens** runs with the invoking role's permissions and receives only the rule, metric, and numbers that user can already see. Credit analysts and portfolio managers do not have Wilbur; Bessie is their assistant.
 - Staff agents never write into the customer agents' data or recommendations, and the customer agents never call staff tools.
 
 ### 3.5 Roles and access (REGISTRY, part 2)
@@ -157,7 +170,7 @@ One customer role and seven employee roles. A role decides the visible wheel tab
 | `credit_analyst` | Credit Analyst | home, research, benefits, activity | `staff.access`, `staff.prospect`, `staff.creditresearch`, `staff.decision`, `staff.benefits` (own) |
 | `service_specialist` | Customer Service Specialist | home, cases, benefits, learn | `staff.access`, `staff.cases`, `staff.benefits` (own), `learn.explain` |
 | `marketing_analyst` | Retention / Marketing Analyst | home, portfolio, benefits, learn | `staff.access`, `staff.campaigns`, `staff.portfolio` (campaign results), `staff.benefits` (own), `learn.explain` |
-| `portfolio_manager` | Portfolio / Risk Manager | home, portfolio, benefits, learn | `staff.access`, `staff.portfolio`, `staff.benefits` (own), `learn.explain` |
+| `portfolio_manager` | Portfolio / Risk Manager | home, portfolio, benefits, activity | `staff.access`, `staff.portfolio`, `staff.benefits` (own); Activity shows only own actions on assigned clients |
 | `compliance_analyst` | Compliance Analyst | home, compliance, benefits, learn | `staff.access`, `staff.fairness`, `staff.anomaly`, `staff.audit`, `staff.decision` (review), `staff.benefits` (own), `learn.explain` |
 | `auditor` | Auditor | home, compliance, benefits, learn | `staff.access`, `staff.audit` (read-only), `staff.benefits` (own), `learn.explain` |
 | `benefits_admin` | Benefits Admin | home, benefits, learn | `staff.access`, `staff.benefits` (admin), `learn.explain` |
@@ -169,13 +182,14 @@ One customer role and seven employee roles. A role decides the visible wheel tab
 | Prospect credit file (generated prospects) | F | — | — | G | M | L | — | — |
 | Research runs and reason codes | F | — | — | G | F (review) | L | — | — |
 | Human credit decisions and override reasons | F (own) | — | — | G | F (review) | L | — | — |
-| Existing-customer contract and balances | F via purpose-bound access | A | M (banded, consented only) | G | — | L | — | O |
-| Exact income and direct identifiers | F via purpose-bound access | A (minimum needed) | — | — | — | — | — | O |
+| Existing-customer contract and balances | F via purpose-bound access | A | M (banded, consented only) | A (portfolio and minimum financial context); G otherwise | — | L | — | O |
+| Exact income and direct identifiers | F via purpose-bound access | A (minimum needed) | — | A (assigned portfolio financial context and client label only) | — | — | — | O |
 | `vulnerable_flag` and stress signal | read-only protection signal, never a scoring input | A (read-only) | used only to exclude from lists, never shown | — | — | — | — | — |
 | Handoff cases | — | A | — | G (counts, ages) | — | L | — | O (own case status) |
 | Consented marketing audiences | — | — | M | G | — | L | — | — |
 | Fairness metrics and group labels | — | — | — | G | F | — | — | — |
 | Portfolio aggregates | — | — | G (campaign results) | G | G | — | — | — |
+| Investment profiles, holdings, assessments and rebalance history | — | — | — | A; W for profile assumptions and explicit simulated approval | — | — | — | — |
 | Policy configuration (`credit_policies`) | R | — | — | — | R | R | — | — |
 | Audit log | — | — | — | — | F (R) | F (R) | — | — |
 | Own benefits ledger | O | O | O | O | O | O | F (benefits data only) | — |
