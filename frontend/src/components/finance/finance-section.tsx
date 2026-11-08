@@ -10,6 +10,7 @@ import { CustomerInvestments } from "@/components/finance/customer-investments";
 import { Textarea } from "@/components/ui/textarea";
 import { useCustomerSession } from "@/lib/customer-session";
 import { savingsTransfer, trimmedBills, savingsGoal, loanPlan, projectCash } from "@/lib/finance-scenarios";
+import { recordedIncomeVariation, simulateCash } from "@/lib/cash-monte-carlo";
 import { askAmelia, loadTracker, money, num, pct, type Snapshot } from "@/lib/finance-api";
 
 export type FinanceView = "money" | "bills" | "goals" | "health" | "whatif" | "investments";
@@ -59,7 +60,7 @@ const SECTION_GUIDE: Record<FinanceView, string> = {
   bills: "Understand how much of your income goes toward regular bills, subscriptions and minimum debt payments. Try trimming expenses to see what could remain each month; subscriptions are reduced first.",
   goals: "See how much emergency savings you have and choose the cushion you want to build. Adjust your monthly contribution to estimate the amount you still need and how long reaching your goal could take.",
   health: "Understand what you owe, the cost of interest and how much of your income goes toward debt payments. Change the loan settings or add extra payments to explore the effect on total interest, payoff time and money left each month.",
-  whatif: "Explore how an income drop, higher living costs, an emergency expense or a delayed payday could affect your cash. Compare the scenario with your starting outlook to spot possible shortfalls before deciding on a next step.",
+  whatif: "Explore how an income drop, higher costs, an emergency or a delayed payday could affect your cash. Monte Carlo simulation tests many possible income and spending outcomes, helping you see a range of balances and possible cash shortfalls.",
   investments: "Understand your investment mix, its modeled ups and downs and how it fits your goals. Explore a future-value scenario, adjust your risk profile and compare rebalancing suggestions before considering a change.",
 };
 
@@ -485,6 +486,9 @@ function WhatIfView({ latest }: { latest: Snapshot }) {
   const [livingUp, setLivingUp] = useState(0);
   const [emergency, setEmergency] = useState(0);
   const [delay, setDelay] = useState(0);
+  const defaultIncomeVariation = Math.round(recordedIncomeVariation(latest) * 1000) / 10;
+  const [incomeVariation, setIncomeVariation] = useState(defaultIncomeVariation);
+  const [spendingVariation, setSpendingVariation] = useState(10);
 
   const apply = (next: "normal" | "disruption" | "expense") => {
     setScenario(next);
@@ -494,6 +498,8 @@ function WhatIfView({ latest }: { latest: Snapshot }) {
       setLivingUp(0);
       setEmergency(0);
       setDelay(0);
+      setIncomeVariation(defaultIncomeVariation);
+      setSpendingVariation(10);
     } else if (next === "disruption") {
       setDays(90);
       setIncomeCut(40);
@@ -513,10 +519,14 @@ function WhatIfView({ latest }: { latest: Snapshot }) {
     () => projectCash(latest, { days, incomeCut, livingUp, emergency, delay }),
     [latest, days, incomeCut, livingUp, emergency, delay],
   );
+  const simulation = useMemo(() => simulateCash(latest, { days, incomeCut, livingUp, emergency, delay }, {
+    incomeVariation: incomeVariation / 100, spendingVariation: spendingVariation / 100,
+  }), [latest, days, incomeCut, livingUp, emergency, delay, incomeVariation, spendingVariation]);
+  const chartPoints = forecast.points.map((point, index) => ({ ...point, ...simulation.points[index] }));
 
   return (
     <Desk
-      eyebrow="Lowest available balance"
+      eyebrow="Lowest balance in fixed scenario"
       figure={money(forecast.lowest)}
       note={`Ending ${money(forecast.ending)}. First shortfall: ${forecast.shortfall ?? "none"}. Baseline keeps today’s income and bills.`}
       sliders={
@@ -539,6 +549,8 @@ function WhatIfView({ latest }: { latest: Snapshot }) {
           <MoneySlider label="Living cost increase" value={livingUp} min={0} max={80} step={5} suffix="%" onChange={(value) => { setScenario(null); setLivingUp(value); }} />
           <MoneySlider label="One-time emergency" value={emergency} min={0} max={10000} step={100} onChange={(value) => { setScenario(null); setEmergency(value); }} />
           <MoneySlider label="Payday delay" value={delay} min={0} max={30} step={1} suffix=" d" onChange={(value) => { setScenario(null); setDelay(value); }} />
+          <MoneySlider label="Income variation" value={incomeVariation} min={0} max={100} step={0.1} suffix="%" onChange={setIncomeVariation} />
+          <MoneySlider label="Spending variation" value={spendingVariation} min={0} max={100} step={1} suffix="%" onChange={setSpendingVariation} />
         </>
       }
       stats={[
@@ -548,12 +560,31 @@ function WhatIfView({ latest }: { latest: Snapshot }) {
         ["Pay cadence", latest.pay_frequency],
       ]}
     >
+      <section aria-label="Monte Carlo simulation" className="space-y-4 rounded-2xl border border-primary/30 bg-primary/5 p-4">
+        <h2 className="font-display font-bold">Monte Carlo: many possible futures</h2>
+        <p className="text-sm text-muted-foreground">We run {simulation.runs.toLocaleString("en-US")} possible cash-flow paths, varying income and living costs around your scenario. This shows how outcomes could differ instead of treating a single forecast as certain.</p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div><p className="text-xs text-muted-foreground">Median ending balance</p><p className="mt-1 text-lg font-semibold">{money(simulation.ending.Median)}</p></div>
+          <div><p className="text-xs text-muted-foreground">Middle 80% of ending balances</p><p className="mt-1 text-lg font-semibold">{money(simulation.ending.Lower)} to {money(simulation.ending.Upper)}</p></div>
+          <div><p className="text-xs text-muted-foreground">Runs with a cash shortfall</p><p className="mt-1 text-lg font-semibold">{pct(simulation.shortfallRate)} ({simulation.shortfallRuns} of {simulation.runs})</p></div>
+        </div>
+        <p className="text-xs text-muted-foreground">A shortfall means the daily closing cash balance fell below zero at least once during the selected period. These are simulated frequencies under your assumptions, not a measured probability of what will happen to you.</p>
+        <details className="text-xs text-muted-foreground"><summary className="cursor-pointer font-medium text-foreground">How to read this simulation</summary>
+          <p className="mt-2">The median is the middle simulated outcome. At each chart date, Lower and Upper mark the tenth and ninetieth percentiles; the middle eighty percent of simulated balances fall between them. This does not mean an entire cash-flow path stays inside those lines.</p>
+          <p className="mt-2">Income variation starts from recorded recent income volatility when available, or a ten-percent example assumption. Spending variation starts at an illustrative ten percent. The sliders control relative variation, not the chance of an income cut or cost increase. Income and living costs vary independently in thirty-day blocks using nonnegative, mean-preserving lognormal factors. Minimum debt payments and your chosen emergency amount and payday delay stay fixed.</p>
+          <p className="mt-2">The same random draws are reused when you adjust sliders, so comparisons do not flicker. This simplified model excludes correlations, taxes, additional emergencies and unrecorded obligations. It is a planning illustration, not a guarantee.</p>
+          <a href="https://www.itl.nist.gov/div898/handbook/eda/section3/eda3669.htm" target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-primary underline">Distribution reference: NIST statistical handbook</a>
+        </details>
+      </section>
       <TrendChart
-        title="The next chapter of your balance"
-        data={forecast.points}
+        title="Your fixed scenario and simulated balance range"
+        data={chartPoints}
         lines={[
           { key: "Scenario", color: "var(--primary)" },
           { key: "Baseline", color: "var(--destructive)" },
+          { key: "Lower", color: "#f59e0b" },
+          { key: "Median", color: "#38bdf8" },
+          { key: "Upper", color: "#a78bfa" },
         ]}
       />
       <p className="text-xs text-muted-foreground">

@@ -105,6 +105,20 @@ describe("Finance slider wiring", () => {
     expect(chart()).toEqual(original);
   });
 
+  it("explains Monte Carlo and collapses the simulated range when variation is zero", () => {
+    render(<FinanceSection view="whatif" onViewChange={vi.fn()} />);
+    expect(screen.getByRole("region", { name: "Monte Carlo simulation" })).toHaveTextContent("1,000 possible cash-flow paths");
+    expect(screen.getByText("Runs with a cash shortfall")).toBeInTheDocument();
+    expect(chart().at(-1)!["Lower"]).toBeLessThan(Number(chart().at(-1)!["Upper"]));
+    change("Income variation", 0); change("Spending variation", 0);
+    for (const point of chart()) {
+      expect(point["Lower"]).toBe(point["Scenario"]);
+      expect(point["Median"]).toBe(point["Scenario"]);
+      expect(point["Upper"]).toBe(point["Scenario"]);
+    }
+    expect(screen.getByText(/not a measured probability/)).toBeInTheDocument();
+  });
+
   it("keeps small debts, short remaining terms and higher recorded APRs", () => {
     Object.assign(state.snapshot, { total_debt_balance: 831.43, weighted_avg_apr: 31.7, remaining_loan_term_months: 7 });
     render(<FinanceSection view="health" onViewChange={vi.fn()} />);
