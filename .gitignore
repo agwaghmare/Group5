@@ -16,6 +16,9 @@ data/starter_system_prompt.txt
 data/README.md
 
 # Python
+.env
+.env.*
+!.env.example
 __pycache__/
 *.pyc
 .venv/
