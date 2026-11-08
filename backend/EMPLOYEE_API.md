@@ -1,6 +1,6 @@
 # Employee backend handoff
 
-**Current account/AI setup:** see [BESSIE_SETUP.md](BESSIE_SETUP.md). Normal sign-in now requires a provisioned email/password account. Demo login and auto-seeding are disabled; old sample logins below are historical. Bessie uses MISTRAL_API_KEY directly, without AGENT_PROVIDER. Existing financial data remains synthetic.
+**Current account/AI setup:** see [BESSIE_SETUP.md](BESSIE_SETUP.md). Normal sign-in now requires a provisioned email/password account. Demo login and auto-seeding are disabled; old sample logins below are historical. Bessie uses NVIDIA_API_KEY directly, without AGENT_PROVIDER. Existing financial data remains synthetic.
 
 **Current storage:** SQLAlchemy + local SQLite. See [SQLALCHEMY_SETUP.md](SQLALCHEMY_SETUP.md)
 for the schema, email accounts, all-role views and verification. Customer and employee
@@ -100,7 +100,7 @@ mutation, role denial and mock assistant call is audited. Never show API keys.
 | GET /staff/campaigns/audience | Marketing: empty until consent/protection/channel source exists |
 | POST /staff/campaigns | Marketing: blocked with 409 while audience is unavailable; never sends |
 | GET /staff/compliance/anomalies | Compliance: explicit awaiting-detection-source state |
-| POST /staff/assistant | Role-scoped deterministic Bessie/Wilbur placeholder |
+| POST /staff/assistant | Role-scoped Bessie/Wilbur NVIDIA explanations and immediate greetings |
 
 ### Credit Analyst example
 
@@ -149,29 +149,34 @@ group labels, benefits and prompt text are excluded. Counterfactuals are returne
 only when replaying the full policy proves a better outcome. Empty counterfactuals
 mean no supported numerical improvement was found, not that nothing could improve.
 
-### Bessie and Wilbur placeholders
+### Bessie and Wilbur
 
 ```json
 POST /staff/assistant
 {
   "feature_id":"staff.creditresearch",
+  "agent":"bessie",
   "resource_id":"<research run id>",
   "question":"Why does this need review?"
 }
 ```
 
-The response explicitly says `provider: mock` and
-`status: placeholder_no_external_model`. It returns structured authorized evidence
-and a deterministic explanation. Question text is not executed or interpreted by
-a live model. The current trace is a code pipeline, not a LangGraph execution.
+The response uses `provider: nvidia`, `status: evidence_validated` and identifies
+the selected agent and prompt version. Greetings use `provider: application` and
+`status: greeting`, without a model call or financial evidence. The default agent
+is Bessie; the explicit Explain This panel sends `agent: wilbur` and uses Wilbur's
+separate prompt with `learn.explain`. The trace is a code pipeline, not LangGraph.
 For `staff.cases`, pass a case ID; `staff.benefits` needs no resource ID.
 `learn.explain` with a research run ID explains utilization and debt-to-income
 using the analyst's granted run or compliance's masked evidence. Without an ID it
-explains benefit math. Existing customer Learn behavior is retained.
+provides general learning help. Without a feature, requests default to
+`staff.access` for general workspace questions. Benefits are only supplied for
+the Benefits feature or an explicit benefits question from general chat.
+Existing customer Learn behavior is retained. See BESSIE_SETUP.md for live setup.
 
-Placeholders for Bessie, Amelia, Wilbur and Gemini are in `.env`. Adding keys alone
-does not silently activate a model. A future provider adapter must retain the
-role gate, numerical validator and no-external-action boundary.
+`NVIDIA_API_KEY` configures the staff agents on the backend. The adapter retains
+the role gate, numerical validator and no-external-action boundary. Customer
+Amelia is a separate integration and is not changed by staff chat requests.
 
 ### Benefits and cases
 
