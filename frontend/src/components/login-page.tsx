@@ -142,7 +142,7 @@ export function LoginPage() {
     writeStaffToken(null);
     writeCustomerSession(session);
     if (session.customerId) setStoredCustomerId(session.customerId);
-    dockThen("customer", ["Home", "Auto", "Finance", "Learn"], () => void navigate({ to: "/" }));
+    dockThen("customer", ["Home", "Wallet", "Finance", "Learn"], () => void navigate({ to: "/" }));
   };
 
   const enterStaff = (session: CustomerSession, tabs: string[]) => {

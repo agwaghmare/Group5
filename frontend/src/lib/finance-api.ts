@@ -68,6 +68,40 @@ export async function loadTracker(): Promise<TrackerPayload> {
   return payload;
 }
 
+export interface AmeliaAnswer {
+  answer: string;
+  reasons: string[];
+  limitations: string[];
+  provider: string;
+  status: string;
+  agent: string;
+}
+
+function detailOf(detail: unknown) {
+  if (typeof detail === "string") return detail;
+  if (detail && typeof detail === "object" && "message" in detail) {
+    return String((detail as { message: unknown }).message);
+  }
+  return "Amelia could not complete this request.";
+}
+
+export async function askAmelia(featureId: string, question: string): Promise<AmeliaAnswer> {
+  const session = readCustomerSession();
+  if (!session?.token) throw new Error("Sign in with a customer email to ask Amelia.");
+  const response = await fetch(`${BASE}/api/v1/pnc/assistant`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.token}`,
+    },
+    body: JSON.stringify({ feature_id: featureId, question }),
+  });
+  const payload = (await response.json().catch(() => ({}))) as AmeliaAnswer & { detail?: unknown };
+  if (!response.ok) throw new Error(detailOf(payload.detail));
+  return payload;
+}
+
 export function num(value: number | string | null | undefined): number {
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) ? n : 0;

@@ -8,7 +8,7 @@ const SECTIONS: {
   name: string;
   title: string;
   body: string;
-  to?: "/finance" | "/learn";
+  to?: "/finance" | "/learn" | "/wallet";
   cta?: string;
 }[] = [
   {
@@ -17,9 +17,11 @@ const SECTIONS: {
     body: "One cockpit for everything you own, owe and plan.",
   },
   {
-    name: "Auto",
-    title: "Drive smarter.",
-    body: "Track loans, insurance and upkeep for every vehicle.",
+    name: "Wallet",
+    title: "Level up your finances.",
+    body: "Milestones, rewards wallet, XP, achievements, and FinPilot Credits.",
+    to: "/wallet",
+    cta: "Open Wallet",
   },
   {
     name: "Finance",

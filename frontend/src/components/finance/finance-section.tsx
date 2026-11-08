@@ -5,10 +5,30 @@ import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, T
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Textarea } from "@/components/ui/textarea";
 import { useCustomerSession } from "@/lib/customer-session";
-import { loadTracker, money, num, pct, type Snapshot } from "@/lib/finance-api";
+import { askAmelia, loadTracker, money, num, pct, type Snapshot } from "@/lib/finance-api";
 
 export type FinanceView = "money" | "bills" | "goals" | "health" | "whatif";
+
+export const VIEW_FEATURE: Record<FinanceView, string> = {
+  money: "fin.profile",
+  bills: "fin.moneyleaks",
+  goals: "fin.moneymission",
+  health: "fin.debt",
+  whatif: "fin.futureyou",
+};
+
+const AMELIA_SKILLS: { id: string; label: string }[] = [
+  { id: "fin.profile", label: "Picture" },
+  { id: "fin.xray", label: "X-Ray" },
+  { id: "fin.futureyou", label: "FutureYou" },
+  { id: "fin.moneymission", label: "Plan" },
+  { id: "fin.immune", label: "Shock" },
+  { id: "fin.moneyleaks", label: "Leaks" },
+  { id: "fin.debt", label: "Debt" },
+  { id: "fin.coach", label: "Coach" },
+];
 
 const NAV: { id: FinanceView; label: string }[] = [
   { id: "money", label: "My Money" },
@@ -66,6 +86,107 @@ export function FinanceSection({
       {latest && view === "health" && <HealthView latest={latest} />}
       {latest && view === "whatif" && <WhatIfView latest={latest} />}
     </div>
+  );
+}
+
+export function AmeliaRail({
+  featureId,
+  hint,
+}: {
+  featureId: string;
+  hint: string;
+}) {
+  const [skill, setSkill] = useState(featureId);
+  const [question, setQuestion] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [turns, setTurns] = useState<{ question: string; answer: string }[]>([]);
+  const prompts = [
+    "What should I notice first?",
+    "Do I still have an emergency cushion?",
+    "Where is money leaking?",
+  ];
+  const ask = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setPending(true);
+    setError(null);
+    void askAmelia(skill, trimmed)
+      .then((row) => {
+        setTurns((current) => [
+          ...current,
+          {
+            question: trimmed,
+            answer: `${row.answer} (${row.provider} · ${row.status})`,
+          },
+        ]);
+        setQuestion("");
+      })
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Amelia could not answer."))
+      .finally(() => setPending(false));
+  };
+  return (
+    <aside className="flex h-full w-full flex-col border-border bg-background p-4 lg:w-80 lg:border-l">
+      <p className="font-display text-lg font-extrabold">Amelia</p>
+      <p className="text-xs text-muted-foreground">
+        Mistral-backed explanations of your synthetic tracker. Not financial advice.
+      </p>
+      <p className="mt-2 text-xs text-muted-foreground">{hint}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {AMELIA_SKILLS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={`rounded-full border px-3 py-1 text-left text-xs ${skill === item.id ? "border-primary text-primary" : "border-border hover:border-primary"}`}
+            onClick={() => setSkill(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {prompts.map((prompt) => (
+          <button
+            key={prompt}
+            type="button"
+            className="rounded-full border border-border px-3 py-1 text-left text-xs hover:border-primary"
+            onClick={() => ask(prompt)}
+          >
+            {prompt}
+          </button>
+        ))}
+      </div>
+      <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto">
+        {turns.length === 0 && (
+          <p className="text-sm text-muted-foreground">Answers stay on this side of the desk.</p>
+        )}
+        {turns.map((turn, index) => (
+          <article key={index} className="rounded-2xl border border-border p-3 text-sm">
+            <p className="font-display font-bold">{turn.question}</p>
+            <p className="mt-1 text-muted-foreground">{turn.answer}</p>
+          </article>
+        ))}
+      </div>
+      <form
+        className="mt-3 flex flex-col gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          ask(question);
+        }}
+      >
+        <Textarea
+          value={question}
+          onChange={(event) => setQuestion(event.target.value)}
+          placeholder="Ask Amelia"
+          aria-label="Ask Amelia"
+          rows={3}
+        />
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <Button type="submit" disabled={pending || !question.trim()}>
+          {pending ? "Asking…" : "Ask Amelia"}
+        </Button>
+      </form>
+    </aside>
   );
 }
 
