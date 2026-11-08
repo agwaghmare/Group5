@@ -1,14 +1,41 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { CircleDot, Settings, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useCustomerSession, writeCustomerSession } from "@/lib/customer-session";
 
-export function FinpilotHeader({ miniWheel = false, onHome, onWheelReturn }: { miniWheel?: boolean; onHome?: () => void; onWheelReturn?: () => void }) {
+export function FinpilotHeader({
+  miniWheel = false,
+  onHome,
+  onWheelReturn,
+  onProfile,
+  role,
+  badge,
+}: {
+  miniWheel?: boolean;
+  onHome?: () => void;
+  onWheelReturn?: () => void;
+  onProfile?: () => void;
+  role?: string;
+  badge?: string;
+}) {
+  const navigate = useNavigate();
+  const customer = useCustomerSession();
   return (
     <header className="flex items-center justify-between gap-2 px-2 pb-4 md:px-4">
       <Button asChild variant="ghost" className="h-auto p-0 font-display text-2xl font-extrabold hover:bg-transparent md:text-3xl">
         <Link to="/" onClick={onHome}>FIN<span className="text-primary">PILOT</span></Link>
       </Button>
       <nav className="flex items-center gap-1 text-muted-foreground sm:gap-4">
+        {role && <span className="hidden text-xs font-bold uppercase tracking-wide text-primary sm:inline">{role}</span>}
+        {badge && <span className="hidden text-xs uppercase tracking-wide sm:inline">{badge}</span>}
         {miniWheel && (onWheelReturn ? (
           <Button variant="ghost" size="icon" className="text-primary" title="Return to wheel navigation" aria-label="Return to wheel navigation" onClick={onWheelReturn}>
             <CircleDot />
@@ -19,7 +46,30 @@ export function FinpilotHeader({ miniWheel = false, onHome, onWheelReturn }: { m
           </Button>
         ))}
         <Button variant="ghost" aria-label="Settings"><Settings /><span className="hidden sm:inline">Settings</span></Button>
-        <Button variant="ghost" aria-label="Profile"><UserCircle /><span className="hidden sm:inline">Profile</span></Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" aria-label="Profile" className="outline-none"><UserCircle /><span className="hidden sm:inline">Profile</span></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>{customer?.email ?? role ?? "Not signed in"}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => void navigate({ to: "/employee" })}>Employee view</DropdownMenuItem>
+            {customer && <DropdownMenuItem onSelect={() => void navigate({ to: "/" })}>Customer view</DropdownMenuItem>}
+            {onProfile && <DropdownMenuItem onSelect={onProfile}>Switch persona</DropdownMenuItem>}
+            {customer ? (
+              <DropdownMenuItem
+                onSelect={() => {
+                  writeCustomerSession(null);
+                  void navigate({ to: "/login" });
+                }}
+              >
+                Sign out
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onSelect={() => void navigate({ to: "/login" })}>Customer sign in</DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </nav>
     </header>
   );

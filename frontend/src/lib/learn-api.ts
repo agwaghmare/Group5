@@ -236,6 +236,7 @@ export const learnApi = {
     customer_id?: string | undefined;
     tracker_user_id?: number | undefined;
     user_id?: string | undefined;
+    lesson_id?: string | undefined;
     go_deeper?: boolean | undefined;
   }) =>
     request<ExplainResult>("/learn/context/explain", {

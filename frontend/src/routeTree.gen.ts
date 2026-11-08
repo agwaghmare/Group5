@@ -10,13 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as EmployeeRouteImport } from './routes/employee'
 import { Route as FinanceRouteImport } from './routes/finance'
 import { Route as LearnRouteImport } from './routes/learn'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as PageFiveRouteImport } from './routes/page-five'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmployeeRoute = EmployeeRouteImport.update({
+  id: '/employee',
+  path: '/employee',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FinanceRoute = FinanceRouteImport.update({
@@ -29,6 +36,11 @@ const LearnRoute = LearnRouteImport.update({
   path: '/learn',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PageFiveRoute = PageFiveRouteImport.update({
   id: '/page-five',
   path: '/page-five',
@@ -37,35 +49,50 @@ const PageFiveRoute = PageFiveRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/employee': typeof EmployeeRoute
   '/finance': typeof FinanceRoute
   '/learn': typeof LearnRoute
+  '/login': typeof LoginRoute
   '/page-five': typeof PageFiveRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/employee': typeof EmployeeRoute
   '/finance': typeof FinanceRoute
   '/learn': typeof LearnRoute
+  '/login': typeof LoginRoute
   '/page-five': typeof PageFiveRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/employee': typeof EmployeeRoute
   '/finance': typeof FinanceRoute
   '/learn': typeof LearnRoute
+  '/login': typeof LoginRoute
   '/page-five': typeof PageFiveRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/finance' | '/learn' | '/page-five'
+  fullPaths: '/' | '/employee' | '/finance' | '/learn' | '/login' | '/page-five'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/finance' | '/learn' | '/page-five'
-  id: '__root__' | '/' | '/finance' | '/learn' | '/page-five'
+  to: '/' | '/employee' | '/finance' | '/learn' | '/login' | '/page-five'
+  id:
+    | '__root__'
+    | '/'
+    | '/employee'
+    | '/finance'
+    | '/learn'
+    | '/login'
+    | '/page-five'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  EmployeeRoute: typeof EmployeeRoute
   FinanceRoute: typeof FinanceRoute
   LearnRoute: typeof LearnRoute
+  LoginRoute: typeof LoginRoute
   PageFiveRoute: typeof PageFiveRoute
 }
 
@@ -76,6 +103,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/employee': {
+      id: '/employee'
+      path: '/employee'
+      fullPath: '/employee'
+      preLoaderRoute: typeof EmployeeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/finance': {
@@ -92,6 +126,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LearnRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/page-five': {
       id: '/page-five'
       path: '/page-five'
@@ -104,8 +145,10 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  EmployeeRoute: EmployeeRoute,
   FinanceRoute: FinanceRoute,
   LearnRoute: LearnRoute,
+  LoginRoute: LoginRoute,
   PageFiveRoute: PageFiveRoute,
 }
 export const routeTree = rootRouteImport

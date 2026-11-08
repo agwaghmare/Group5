@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { FinpilotHeader } from "@/components/finpilot-header";
+import { RequireCustomer } from "@/components/require-customer";
 import { LearnSection, type LearnView } from "@/components/learn/learn-section";
 
 type LearnSearch = {
@@ -46,6 +47,7 @@ function LearnPage() {
     void navigate({ search: (prev) => ({ ...prev, ...next }), replace: false });
 
   return (
+    <RequireCustomer>
     <div className="flex h-dvh flex-col overflow-hidden bg-background p-4 md:p-6">
       <FinpilotHeader miniWheel />
       <main className="fifth-page-enter flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[2rem] border border-border px-6 py-8 md:px-14">
@@ -63,5 +65,6 @@ function LearnPage() {
         />
       </main>
     </div>
+    </RequireCustomer>
   );
 }

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { LandingPage } from "@/components/finpilot-landing";
+import { RequireCustomer } from "@/components/require-customer";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -12,6 +13,10 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: LandingPage,
+  component: () => (
+    <RequireCustomer>
+      <LandingPage />
+    </RequireCustomer>
+  ),
 });
 

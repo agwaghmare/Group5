@@ -113,6 +113,26 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+.login-wheel {
+  animation: login-wheel-spin 48s linear infinite;
+}
+
+.login-wheel-dock.is-docking {
+  transition: transform 720ms cubic-bezier(0.65, 0, 0.25, 1);
+  transform: translate(var(--dock-x), var(--dock-y)) scale(var(--dock-scale));
+  z-index: 30;
+}
+
+.login-card.is-docking {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 280ms ease;
+}
+
+@keyframes login-wheel-spin {
+  to { transform: rotate(360deg); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .wheel-implode, .wheel-page-reveal, .wheel-page-return, .fifth-page-enter { animation-duration: 1ms; }
+  .wheel-implode, .wheel-page-reveal, .wheel-page-return, .fifth-page-enter, .login-wheel { animation-duration: 1ms; }
 }

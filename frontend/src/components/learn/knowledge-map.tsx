@@ -1,20 +1,101 @@
-import { useMemo } from "react";
-import { Check, Lock } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   KnowledgeMap as KnowledgeMapData,
+  MapEdge,
   MapNode,
 } from "@/lib/learn-api";
 
-const COL_W = 196;
-const ROW_H = 92;
-const NODE_W = 164;
-const NODE_H = 60;
-const PAD = 24;
+const BOX_W = 168;
+const BOX_H = 64;
+const GAP_X = 28;
+const GAP_Y = 56;
+const PAD = 36;
 
-/**
- * Prerequisite graph. Columns are topics (left → right), rows are lesson order within a topic.
- * Edges are drawn as curves from a prerequisite to the lesson it unlocks.
- */
+type Box = { x: number; y: number };
+type Branch = { id: string; children: Branch[] };
+
+function treeEdges(nodes: MapNode[], edges: MapEdge[]): MapEdge[] {
+  const ids = new Set(nodes.map((node) => node.id));
+  const seen = new Set<string>();
+  const kept: MapEdge[] = [];
+  for (const edge of edges) {
+    if (!ids.has(edge.source) || !ids.has(edge.target) || seen.has(edge.target)) continue;
+    seen.add(edge.target);
+    kept.push(edge);
+  }
+  return kept;
+}
+
+function forest(nodes: MapNode[], edges: MapEdge[]): Branch[] {
+  const kids = new Map<string, string[]>();
+  const child = new Set<string>();
+  for (const node of nodes) kids.set(node.id, []);
+  for (const edge of treeEdges(nodes, edges)) {
+    kids.get(edge.source)!.push(edge.target);
+    child.add(edge.target);
+  }
+  const grow = (id: string): Branch => ({
+    id,
+    children: (kids.get(id) ?? []).map(grow),
+  });
+  return nodes.filter((node) => !child.has(node.id)).map((node) => grow(node.id));
+}
+
+function layoutTree(nodes: MapNode[], edges: MapEdge[]) {
+  const roots = forest(nodes, edges);
+  const widthOf = (branch: Branch): number => {
+    if (branch.children.length === 0) return BOX_W;
+    const inner = branch.children.reduce((sum, child) => sum + widthOf(child), 0);
+    return inner + GAP_X * (branch.children.length - 1);
+  };
+  const pos = new Map<string, Box>();
+  const place = (branch: Branch, left: number, depth: number) => {
+    const width = widthOf(branch);
+    const y = PAD + depth * (BOX_H + GAP_Y);
+    if (branch.children.length === 0) {
+      pos.set(branch.id, { x: left, y });
+      return;
+    }
+    let cursor = left;
+    for (const child of branch.children) {
+      place(child, cursor, depth + 1);
+      cursor += widthOf(child) + GAP_X;
+    }
+    const first = pos.get(branch.children[0]!.id)!;
+    const last = pos.get(branch.children[branch.children.length - 1]!.id)!;
+    pos.set(branch.id, {
+      x: (first.x + last.x + BOX_W) / 2 - BOX_W / 2,
+      y,
+    });
+    void width;
+  };
+  let cursor = PAD;
+  let maxDepth = 0;
+  const walk = (branch: Branch, depth: number) => {
+    maxDepth = Math.max(maxDepth, depth);
+    branch.children.forEach((child) => walk(child, depth + 1));
+  };
+  roots.forEach((root) => walk(root, 0));
+  for (const root of roots) {
+    place(root, cursor, 0);
+    cursor += widthOf(root) + GAP_X * 2;
+  }
+  let maxX = PAD + BOX_W;
+  let maxY = PAD + BOX_H;
+  for (const box of pos.values()) {
+    maxX = Math.max(maxX, box.x + BOX_W);
+    maxY = Math.max(maxY, box.y + BOX_H);
+  }
+  return {
+    pos,
+    edges: treeEdges(nodes, edges),
+    worldW: maxX + PAD,
+    worldH: maxY + PAD,
+    depth: maxDepth,
+  };
+}
+
+/** Top-down tree. Each concept has one parent, and the link is a right-angle elbow in the gap. */
 export function KnowledgeMapView({
   data,
   selected,
@@ -24,149 +105,156 @@ export function KnowledgeMapView({
   selected?: string | null;
   onSelect: (node: MapNode) => void;
 }) {
-  const pos = useMemo(() => {
-    const map = new Map<string, { x: number; y: number }>();
-    for (const n of data.nodes) {
-      map.set(n.id, { x: PAD + n.x * COL_W, y: PAD + 36 + n.y * ROW_H });
-    }
-    return map;
-  }, [data.nodes]);
+  const layout = useMemo(() => layoutTree(data.nodes, data.edges), [data.nodes, data.edges]);
+  const [query, setQuery] = useState("");
+  const [camera, setCamera] = useState({ x: 0, y: 0, k: 1 });
+  const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null);
+  const frame = useRef<HTMLDivElement>(null);
+  const cameraRef = useRef(camera);
+  const worldRef = useRef({ w: layout.worldW, h: layout.worldH });
+  cameraRef.current = camera;
+  worldRef.current = { w: layout.worldW, h: layout.worldH };
+  const needle = query.trim().toLowerCase();
 
-  const cols = data.topics.length;
-  const rows = Math.max(1, ...data.nodes.map((n) => n.y + 1));
-  const width = PAD * 2 + cols * COL_W;
-  const height = PAD * 2 + 36 + rows * ROW_H;
+  useEffect(() => {
+    const node = frame.current;
+    if (!node) return;
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const rect = node.getBoundingClientRect();
+      const current = cameraRef.current;
+      const world = worldRef.current;
+      const next = Math.min(1.8, Math.max(0.55, current.k * (event.deltaY > 0 ? 0.92 : 1.08)));
+      const px = ((event.clientX - rect.left) / rect.width) * world.w;
+      const py = ((event.clientY - rect.top) / rect.height) * world.h;
+      setCamera({ k: next, x: px - worldX(px, current, next), y: py - worldY(py, current, next) });
+    };
+    const worldX = (px: number, current: { x: number; k: number }, next: number) =>
+      ((px - current.x) / current.k) * next;
+    const worldY = (py: number, current: { y: number; k: number }, next: number) =>
+      ((py - current.y) / current.k) * next;
+    node.addEventListener("wheel", onWheel, { passive: false });
+    return () => node.removeEventListener("wheel", onWheel);
+  }, []);
 
   return (
-    <div className="overflow-auto rounded-2xl border border-border bg-card/40">
-      <svg
-        width={width}
-        height={height}
-        role="img"
-        aria-label="Knowledge map of lessons and prerequisites"
-        className="block"
+    <div className="overflow-hidden rounded-2xl border border-border bg-[#101318]">
+      <div className="border-b border-white/10 px-4 py-3">
+        <label className="sr-only" htmlFor="find-concept">
+          Find a concept
+        </label>
+        <input
+          id="find-concept"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Find a concept"
+          className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+        />
+      </div>
+      <div
+        ref={frame}
+        className="relative h-[540px] cursor-grab touch-none active:cursor-grabbing"
+        onPointerDown={(event) => {
+          if ((event.target as Element).closest("[data-node]")) return;
+          drag.current = { x: event.clientX, y: event.clientY, cx: camera.x, cy: camera.y };
+          (event.currentTarget as HTMLDivElement).setPointerCapture(event.pointerId);
+        }}
+        onPointerMove={(event) => {
+          if (!drag.current || !frame.current) return;
+          const rect = frame.current.getBoundingClientRect();
+          const dx = ((event.clientX - drag.current.x) / rect.width) * layout.worldW;
+          const dy = ((event.clientY - drag.current.y) / rect.height) * layout.worldH;
+          setCamera((current) => ({
+            ...current,
+            x: drag.current!.cx + dx,
+            y: drag.current!.cy + dy,
+          }));
+        }}
+        onPointerUp={() => {
+          drag.current = null;
+        }}
       >
-        {data.topics.map((t, i) => (
-          <text
-            key={t.id}
-            x={PAD + i * COL_W + NODE_W / 2}
-            y={PAD + 12}
-            textAnchor="middle"
-            className="fill-muted-foreground font-display text-[10px] font-bold uppercase tracking-[0.2em]"
-          >
-            {t.title}
-          </text>
-        ))}
-        {data.edges.map((e) => {
-          const a = pos.get(e.source);
-          const b = pos.get(e.target);
-          if (!a || !b) return null;
-          const x1 = a.x + NODE_W / 2;
-          const y1 = a.y + NODE_H;
-          const x2 = b.x + NODE_W / 2;
-          const y2 = b.y;
-          const sameCol = Math.abs(x1 - x2) < 1;
-          const d = sameCol
-            ? `M ${x1} ${y1} L ${x2} ${y2}`
-            : `M ${x1} ${y1} C ${x1} ${y1 + 40}, ${x2} ${y2 - 40}, ${x2} ${y2}`;
-          const active = e.target === selected || e.source === selected;
-          return (
-            <path
-              key={`${e.source}->${e.target}`}
-              d={d}
-              fill="none"
-              className={active ? "stroke-primary" : "stroke-border"}
-              strokeWidth={active ? 2 : 1.25}
-              markerEnd="url(#arrow)"
-            />
-          );
-        })}
-        <defs>
-          <marker
-            id="arrow"
-            viewBox="0 0 10 10"
-            refX="9"
-            refY="5"
-            markerWidth="7"
-            markerHeight="7"
-            orient="auto-start-reverse"
-          >
-            <path d="M 0 0 L 10 5 L 0 10 z" className="fill-border" />
-          </marker>
-        </defs>
-        {data.nodes.map((n) => {
-          const p = pos.get(n.id)!;
-          const isSel = n.id === selected;
-          const fill =
-            n.status === "completed"
-              ? "fill-primary"
-              : n.status === "locked"
-                ? "fill-muted"
-                : "fill-card";
-          const stroke = isSel
-            ? "stroke-primary"
-            : n.status === "locked"
-              ? "stroke-border"
-              : "stroke-primary/60";
-          const text =
-            n.status === "completed"
-              ? "fill-primary-foreground"
-              : n.status === "locked"
-                ? "fill-muted-foreground"
-                : "fill-foreground";
-          return (
-            <g
-              key={n.id}
-              role="button"
-              tabIndex={0}
-              aria-label={`${n.title} (${n.status})`}
-              className="cursor-pointer"
-              onClick={() => onSelect(n)}
-              onKeyDown={(ev) => {
-                if (ev.key === "Enter" || ev.key === " ") {
-                  ev.preventDefault();
-                  onSelect(n);
-                }
-              }}
-            >
-              <rect
-                x={p.x}
-                y={p.y}
-                width={NODE_W}
-                height={NODE_H}
-                rx={14}
-                className={`${fill} ${stroke}`}
-                strokeWidth={isSel ? 2.5 : 1.5}
-              />
-              <foreignObject
-                x={p.x + 10}
-                y={p.y + 6}
-                width={NODE_W - 20}
-                height={NODE_H - 12}
-              >
-                <div className="flex h-full items-center gap-2">
-                  {n.status === "completed" ? (
-                    <Check
-                      className="size-3.5 shrink-0 text-primary-foreground"
-                      aria-hidden="true"
-                    />
-                  ) : n.status === "locked" ? (
-                    <Lock
-                      className="size-3.5 shrink-0 text-muted-foreground"
-                      aria-hidden="true"
-                    />
-                  ) : null}
-                  <span
-                    className={`line-clamp-2 text-[11px] leading-tight ${text.replace("fill-", "text-")}`}
-                  >
-                    {n.title}
-                  </span>
-                </div>
-              </foreignObject>
-            </g>
-          );
-        })}
-      </svg>
+        <svg
+          viewBox={`0 0 ${layout.worldW} ${layout.worldH}`}
+          preserveAspectRatio="xMidYMid meet"
+          className="absolute inset-0 h-full w-full"
+          role="img"
+          aria-label="Knowledge map arranged as a top-down tree"
+        >
+          <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.k})`}>
+            {layout.edges.map((edge) => {
+              const from = layout.pos.get(edge.source);
+              const to = layout.pos.get(edge.target);
+              if (!from || !to) return null;
+              const x1 = from.x + BOX_W / 2;
+              const y1 = from.y + BOX_H;
+              const x2 = to.x + BOX_W / 2;
+              const y2 = to.y;
+              const mid = y1 + (y2 - y1) / 2;
+              const active = edge.source === selected || edge.target === selected;
+              return (
+                <path
+                  key={`${edge.source}->${edge.target}`}
+                  d={`M ${x1} ${y1} L ${x1} ${mid} L ${x2} ${mid} L ${x2} ${y2}`}
+                  fill="none"
+                  stroke={active ? "#d7deea" : "#6b7385"}
+                  strokeWidth="1.25"
+                />
+              );
+            })}
+            {data.nodes.map((node) => {
+              const box = layout.pos.get(node.id);
+              if (!box) return null;
+              const match = !needle || node.title.toLowerCase().includes(needle);
+              const isSel = node.id === selected;
+              return (
+                <g
+                  key={node.id}
+                  data-node="true"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${node.title} (${node.status})`}
+                  className="cursor-pointer"
+                  opacity={match ? 1 : 0.28}
+                  onClick={() => onSelect(node)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onSelect(node);
+                    }
+                  }}
+                >
+                  <rect
+                    x={box.x}
+                    y={box.y}
+                    width={BOX_W}
+                    height={BOX_H}
+                    rx="8"
+                    fill="#1a2230"
+                    stroke={isSel ? "#fb7185" : "#3d4658"}
+                    strokeWidth={isSel ? 2.4 : 1.2}
+                  />
+                  <foreignObject x={box.x + 10} y={box.y + 8} width={BOX_W - 20} height={BOX_H - 16}>
+                    <div className="flex h-full w-full items-center justify-center overflow-hidden text-center">
+                      <span
+                        className={`line-clamp-3 break-words text-[12px] leading-snug ${
+                          node.status === "locked" ? "text-[#9aa3b5]" : "text-[#f4f7fb]"
+                        }`}
+                      >
+                        {node.title}
+                      </span>
+                    </div>
+                  </foreignObject>
+                </g>
+              );
+            })}
+          </g>
+        </svg>
+      </div>
+      <p className="border-t border-white/10 px-4 py-2 text-xs text-muted-foreground">
+        Pan and zoom to explore. Select a concept on the graph or use the list below.{" "}
+        {data.nodes.length} concepts
+      </p>
     </div>
   );
 }

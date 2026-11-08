@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { FinpilotHeader } from "@/components/finpilot-header";
+import { RequireCustomer } from "@/components/require-customer";
 import { LandingPage } from "@/components/finpilot-landing";
 
 export const Route = createFileRoute("/page-five")({
@@ -19,6 +20,7 @@ function PageFive() {
   const [returning, setReturning] = useState(false);
   const navigate = useNavigate();
   return (
+    <RequireCustomer>
     <>
     {returning && <div className="pointer-events-none fixed inset-0" aria-hidden="true" inert><LandingPage /></div>}
     <div
@@ -34,5 +36,6 @@ function PageFive() {
       </main>
     </div>
     </>
+    </RequireCustomer>
   );
 }

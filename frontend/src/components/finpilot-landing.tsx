@@ -150,7 +150,9 @@ function Wheel({
                 role="button"
                 aria-label={`Go to ${s.name}`}
                 tabIndex={0}
-                className="cursor-pointer"
+                className="cursor-pointer outline-none focus:outline-none"
+                style={{ outline: "none" }}
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   if (!suppressClick.current) onSelect(i);
                 }}
@@ -176,17 +178,17 @@ function Wheel({
                   textAnchor="middle"
                   dominantBaseline="central"
                   transform={`rotate(${i * STEP} ${c + tr * Math.cos(mid)} ${c + tr * Math.sin(mid)})`}
-                  className={`font-display text-[11px] font-bold ${isActive ? "fill-primary-foreground" : "fill-muted-foreground"}`}
+                  className={`font-display text-[10px] font-bold uppercase ${isActive ? "fill-primary-foreground" : "fill-muted-foreground"}`}
                 >
-                  {isActive ? s.name : i + 1}
+                  {s.name}
                 </text>
               </g>
             );
           })}
         </svg>
         <div className="pointer-events-none absolute inset-0 m-auto flex h-[76px] w-[76px] items-center justify-center rounded-full border border-border bg-background">
-          <span className="font-display text-lg font-bold text-primary">
-            {active + 1}
+          <span className="px-1 text-center font-display text-[11px] font-bold uppercase leading-tight text-primary">
+            {SECTIONS[active]?.name ?? SECTIONS[0]!.name}
           </span>
         </div>
       </div>
@@ -257,6 +259,11 @@ export function LandingPage() {
               {s.to && (
                 <Button asChild className="mt-8 w-fit" size="lg">
                   <Link to={s.to}>{s.cta ?? "Open"}</Link>
+                </Button>
+              )}
+              {i === 0 && (
+                <Button asChild variant="outline" className="mt-4 w-fit" size="lg">
+                  <Link to="/employee">Employee sign in</Link>
                 </Button>
               )}
             </section>

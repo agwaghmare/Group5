@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import {
   Select,
   SelectContent,
@@ -64,23 +65,16 @@ export function FinanceSection({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b border-border/50 pb-4">
-        <nav className="flex flex-wrap gap-6" aria-label="Finance sections">
+        <nav className="flex flex-wrap gap-2" aria-label="Finance sections">
           {NAV.map((item) => (
-            <button
+            <Button
               key={item.id}
               type="button"
+              variant={view === item.id ? "default" : "outline"}
               onClick={() => onViewChange(item.id)}
-              className={`font-display text-sm font-bold tracking-wide transition-colors ${
-                view === item.id
-                  ? "text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
             >
               {item.label}
-              {view === item.id && (
-                <span className="mt-2 block h-0.5 w-full bg-primary" />
-              )}
-            </button>
+            </Button>
           ))}
         </nav>
         <div className="flex items-center gap-3">
@@ -120,6 +114,7 @@ function useFinanceQuery<T>(
     queryKey: ["finance", customerId, ...key],
     queryFn: fn,
     staleTime: 30_000,
+    retry: false,
     enabled: enabled && Boolean(customerId),
   });
 }
@@ -568,15 +563,9 @@ function GoalsView({ customerId }: { customerId: string }) {
             <Field label="Goal name">
               <Input value={name} onChange={(e) => setName(e.target.value)} required />
             </Field>
-            <Field label="Target amount ($)">
-              <Input type="number" min={1} value={target} onChange={(e) => setTarget(Number(e.target.value))} required />
-            </Field>
-            <Field label="Already saved ($)">
-              <Input type="number" min={0} value={saved} onChange={(e) => setSaved(Number(e.target.value))} />
-            </Field>
-            <Field label="Monthly contribution ($)">
-              <Input type="number" min={1} value={monthly} onChange={(e) => setMonthly(Number(e.target.value))} required />
-            </Field>
+            <MoneySlider label="Target amount" value={target} min={500} max={50000} step={500} onChange={setTarget} />
+            <MoneySlider label="Already saved" value={Math.min(saved, target)} min={0} max={Math.max(target, 500)} step={100} onChange={setSaved} />
+            <MoneySlider label="Monthly contribution" value={monthly} min={25} max={2000} step={25} onChange={setMonthly} />
             <Button type="submit" className="w-full" size="lg" disabled={create.isPending}>
               Save my goal <ArrowRight />
             </Button>
@@ -635,6 +624,42 @@ function GoalsView({ customerId }: { customerId: string }) {
           </ul>
         </section>
       )}
+    </div>
+  );
+}
+
+function MoneySlider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  suffix = "",
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+  suffix?: string;
+}) {
+  const shown = suffix === "%" || suffix === " mo" ? `${value}${suffix}` : money(value, value % 1 === 0 ? 0 : 1);
+  return (
+    <div>
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <Label className="text-xs uppercase tracking-wider text-muted-foreground">{label}</Label>
+        <span className="font-display text-sm font-bold tabular-nums text-primary">{suffix === "%" || suffix === " mo" ? shown : money(value, 0)}</span>
+      </div>
+      <Slider
+        value={[value]}
+        min={min}
+        max={max}
+        step={step}
+        onValueChange={(next) => onChange(next[0] ?? min)}
+        aria-label={label}
+      />
     </div>
   );
 }
@@ -729,11 +754,8 @@ function HealthView({ customerId }: { customerId: string }) {
             <h3 className="font-display text-xl font-extrabold">Debt payoff</h3>
             <p className="text-sm text-muted-foreground">Snowball vs avalanche with extra monthly payment</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Label htmlFor="extra" className="text-xs uppercase tracking-wider text-muted-foreground">
-              Extra / mo
-            </Label>
-            <Input id="extra" type="number" className="w-28" value={extra} min={0} onChange={(e) => setExtra(Number(e.target.value) || 0)} />
+          <div className="w-full max-w-sm">
+            <MoneySlider label="Extra payment each month" value={extra} min={0} max={1000} step={25} onChange={setExtra} />
           </div>
         </div>
         <div className="mt-4 divide-y divide-border/50 border-y border-border/50">
@@ -767,30 +789,21 @@ function HealthView({ customerId }: { customerId: string }) {
 
       <section className="rounded-2xl border border-border/70 px-6 py-7">
         <h3 className="font-display text-xl font-extrabold">Car purchase what-if</h3>
-        <p className="mt-1 text-sm text-muted-foreground">Workshop defaults: $30,000 · $5,000 down · 8% · 60 months</p>
+        <p className="mt-1 text-sm text-muted-foreground">Drag the terms, then run the scenario. Nothing is sent as an offer.</p>
         <form
-          className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"
+          className="mt-5 grid gap-5 sm:grid-cols-2"
           onSubmit={(e) => {
             e.preventDefault();
             purchase.mutate();
           }}
         >
-          {(
-            [
-              ["Price", price, setPrice],
-              ["Down", down, setDown],
-              ["APR %", apr, setApr],
-              ["Term", term, setTerm],
-            ] as const
-          ).map(([label, value, set]) => (
-            <div key={label}>
-              <Label className="text-xs uppercase tracking-wider text-muted-foreground">{label}</Label>
-              <Input type="number" className="mt-1" value={value} min={0} onChange={(e) => set(Number(e.target.value))} />
-            </div>
-          ))}
-          <div className="flex items-end">
-            <Button type="submit" className="w-full" disabled={purchase.isPending}>
-              <Landmark /> Run
+          <MoneySlider label="Price" value={price} min={5000} max={80000} step={500} onChange={setPrice} />
+          <MoneySlider label="Down payment" value={Math.min(down, price)} min={0} max={price} step={500} onChange={setDown} />
+          <MoneySlider label="APR" value={apr} min={0} max={24} step={0.5} suffix="%" onChange={setApr} />
+          <MoneySlider label="Term" value={term} min={12} max={84} step={12} suffix=" mo" onChange={setTerm} />
+          <div className="sm:col-span-2">
+            <Button type="submit" disabled={purchase.isPending}>
+              <Landmark /> Run scenario
             </Button>
           </div>
         </form>
