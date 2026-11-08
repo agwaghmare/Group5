@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { writeCustomerSession } from "@/lib/customer-session";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AssistantRail as BessieRail } from "@/components/employee/assistant-rail";
 import { FinpilotHeader } from "@/components/finpilot-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,112 +83,6 @@ function QuickActions({
         </button>
       ))}
     </div>
-  );
-}
-
-function BessieRail({
-  featureId,
-  resourceId,
-  hint,
-}: {
-  featureId: string;
-  resourceId?: string | undefined;
-  hint: string;
-}) {
-  const [question, setQuestion] = useState("");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [turns, setTurns] = useState<{ question: string; answer: string }[]>(
-    [],
-  );
-  const prompts = [
-    "Why does this need review?",
-    "What is missing?",
-    "What would change the outcome?",
-  ];
-  const ask = (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    setPending(true);
-    setError(null);
-    void staffFetch<{ answer: string; provider: string; status: string }>(
-      "/assistant",
-      {
-        body: {
-          feature_id: featureId,
-          resource_id: resourceId,
-          question: trimmed,
-        },
-      },
-    )
-      .then((row) => {
-        setTurns((current) => [
-          ...current,
-          {
-            question: trimmed,
-            answer: `${row.answer} (${row.provider} · ${row.status})`,
-          },
-        ]);
-        setQuestion("");
-      })
-      .catch((err) => setError(messageOf(err)))
-      .finally(() => setPending(false));
-  };
-  return (
-    <aside className="flex h-full w-full flex-col border-border bg-background p-4 lg:w-80 lg:border-l">
-      <p className="font-display text-lg font-extrabold">Bessie</p>
-      <p className="text-xs text-muted-foreground">
-        Mistral-backed explanations of the evidence your role can access.
-      </p>
-      <p className="mt-2 text-xs text-muted-foreground">{hint}</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {prompts.map((prompt) => (
-          <button
-            key={prompt}
-            type="button"
-            className="rounded-full border border-border px-3 py-1 text-left text-xs hover:border-primary"
-            onClick={() => ask(prompt)}
-          >
-            {prompt}
-          </button>
-        ))}
-      </div>
-      <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto">
-        {turns.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            Answers stay on this side of the desk.
-          </p>
-        )}
-        {turns.map((turn, index) => (
-          <article
-            key={index}
-            className="rounded-2xl border border-border p-3 text-sm"
-          >
-            <p className="font-display font-bold">{turn.question}</p>
-            <p className="mt-1 text-muted-foreground">{turn.answer}</p>
-          </article>
-        ))}
-      </div>
-      <form
-        className="mt-3 flex flex-col gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          ask(question);
-        }}
-      >
-        <Textarea
-          value={question}
-          onChange={(event) => setQuestion(event.target.value)}
-          placeholder="Ask Bessie"
-          aria-label="Ask Bessie"
-          rows={3}
-        />
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button type="submit" disabled={pending || !question.trim()}>
-          {pending ? "Asking…" : "Ask Bessie"}
-        </Button>
-      </form>
-    </aside>
   );
 }
 
@@ -319,8 +214,8 @@ export function EmployeeApp() {
     resourceId?: string | undefined;
     hint: string;
   }>({
-    featureId: "staff.benefits",
-    hint: "Ask about benefits, or open a file so Bessie can use that evidence.",
+    featureId: "staff.access",
+    hint: "Ask about your workspace, or open a record to discuss its evidence.",
   });
 
   useEffect(() => {
@@ -460,6 +355,7 @@ export function EmployeeApp() {
                       </p>
                       <BessieRail
                         featureId="learn.explain"
+                        agent="wilbur"
                         resourceId={
                           bessie.resourceId?.startsWith("RUN-")
                             ? bessie.resourceId
@@ -487,19 +383,25 @@ export function EmployeeApp() {
                   ? "staff.fairness"
                   : "staff.audit"
                 : activeTab === "learn"
-                  ? "learn.explain"
+                  ? "staff.access"
                   : activeTab === "research" ||
                       activeTab === "cases" ||
                       activeTab === "portfolio"
                     ? bessie.featureId
-                    : "staff.benefits"
+                    : activeTab === "benefits"
+                      ? "staff.benefits"
+                      : "staff.access"
             }
             resourceId={
               activeTab === "research" || activeTab === "cases"
                 ? bessie.resourceId
                 : undefined
             }
-            hint={bessie.hint}
+            hint={
+              activeTab === "home" || activeTab === "learn"
+                ? "Ask about your workspace or choose a record to discuss."
+                : bessie.hint
+            }
           />
         </div>
       </div>
@@ -641,7 +543,7 @@ function ResearchPanel({
       featureId:
         typeof run?.["id"] === "string"
           ? "staff.creditresearch"
-          : "staff.benefits",
+          : "staff.access",
       resourceId: typeof run?.["id"] === "string" ? run["id"] : undefined,
       hint:
         typeof run?.["id"] === "string"
@@ -1024,7 +926,7 @@ function CasesPanel({
   useEffect(() => {
     if (!focused) return;
     onContext({
-      featureId: caseId ? "staff.cases" : "staff.benefits",
+      featureId: caseId ? "staff.cases" : "staff.access",
       resourceId: caseId ?? undefined,
       hint: caseId
         ? "Bessie can use this case’s consented context."

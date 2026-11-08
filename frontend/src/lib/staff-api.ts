@@ -69,7 +69,12 @@ function detailMessage(detail: unknown) {
 
 export async function staffFetch<T>(
   path: string,
-  init: { method?: string; body?: unknown; token?: string | null } = {},
+  init: {
+    method?: string;
+    body?: unknown;
+    token?: string | null;
+    signal?: AbortSignal;
+  } = {},
 ): Promise<T> {
   const token = init.token === undefined ? readStaffToken() : init.token;
   const headers: Record<string, string> = {};
@@ -78,6 +83,7 @@ export async function staffFetch<T>(
   const response = await fetch(`${BASE}/staff${path}`, {
     method: init.method ?? (init.body !== undefined ? "POST" : "GET"),
     headers,
+    signal: init.signal ?? null,
     ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
   });
   if (response.status === 204) return undefined as T;
