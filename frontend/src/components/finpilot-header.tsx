@@ -112,18 +112,6 @@ export function FinpilotHeader({
               )}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {customer?.isStaff && (
-              <DropdownMenuItem
-                onSelect={() => void navigate({ to: "/employee" })}
-              >
-                Employee workspace
-              </DropdownMenuItem>
-            )}
-            {customer && !customer.isStaff && (
-              <DropdownMenuItem onSelect={() => void navigate({ to: "/" })}>
-                Customer view
-              </DropdownMenuItem>
-            )}
             {onProfile && (
               <DropdownMenuItem onSelect={onProfile}>
                 Account details
