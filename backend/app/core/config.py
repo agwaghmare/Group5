@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     artifact_dir: str = str(BACKEND_DIR / "models")
     redis_url: str | None = None
 
+    solana_rpc_url: str = "http://127.0.0.1:8899"
+    solana_network: str = "localnet"
+    solana_keypair_path: str = str(BACKEND_DIR / "storage" / "solana-local-keypair.json")
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

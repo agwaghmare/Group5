@@ -3,7 +3,7 @@
 Run from the backend directory:
 
     python -m pip install -r requirements.txt
-    python -m uvicorn app.main:app --reload --port 8010
+    python -m uvicorn app.main:app --reload --port 8002
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from app.core.config import get_settings, validate_production_settings
 from app.core.logging import configure_logging
 from app.routers.identity import router as auth_router
 from app.routers.learn import router as learn_router
+from app.routers.solana import router as solana_router
 from app.routers.staff import router as staff_router
 from app.routers.tracker import router as customer_router
 from app.routers.views import router as views_router
@@ -78,6 +79,7 @@ app.include_router(customer_router)
 app.include_router(learn_router)
 app.include_router(staff_router)
 app.include_router(views_router)
+app.include_router(solana_router)
 
 
 @app.get("/")
@@ -108,3 +110,13 @@ def health_db() -> dict:
                     "financial_snapshots": store.db.scalar(select(func.count()).select_from(FinanceSnapshot))}
     except Exception as exc:
         return JSONResponse(status_code=503, content={"status": "unavailable", "error": exc.__class__.__name__})
+
+
+@app.get("/health/solana")
+def health_solana() -> dict:
+    from app.solana import service
+
+    try:
+        return service.status()
+    except service.SolanaError as exc:
+        return JSONResponse(status_code=exc.status_code, content={"detail": str(exc)})
