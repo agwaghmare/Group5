@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { AssistantVoice } from "@/components/assistant-voice";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -134,7 +135,7 @@ export function AmeliaRail({
     { label: "Do I still have an emergency cushion?", skill: "fin.immune" },
     { label: "Where is money leaking?", skill: "fin.moneyleaks" },
   ];
-  const ask = (text: string) => {
+  const ask = (text: string, review = false) => {
     const trimmed = text.trim();
     if (!trimmed || inFlight.current) return;
     inFlight.current = true;
@@ -142,7 +143,8 @@ export function AmeliaRail({
     setPending(true);
     setError(null);
     // Picture and free-form coaching follow the active tab's authorized evidence.
-    const evidenceFeature = skill === "fin.profile" || skill === "fin.coach" ? featureId : skill;
+    const isReview = review || /\bquick\s+(chat|review)\b|\breview\s+(of\s+)?my\s+finances\b/i.test(trimmed);
+    const evidenceFeature = isReview || skill === "fin.profile" || skill === "fin.coach" ? featureId : skill;
     void askAmelia(evidenceFeature, trimmed)
       .then((row) => {
         if (currentRequest !== requestId.current) return;
@@ -166,12 +168,17 @@ export function AmeliaRail({
       });
   };
   return (
-    <aside className="flex h-full w-full flex-col border-border bg-background p-4 lg:w-80 lg:border-l">
+    <aside className="flex h-full w-full flex-col overflow-y-auto border-border bg-background p-4 lg:w-80 lg:border-l">
       <p className="font-display text-lg font-extrabold">Amelia</p>
       <p className="text-xs text-muted-foreground">
         Explanations of your synthetic tracker. Not financial advice.
       </p>
       <p className="mt-2 text-xs text-muted-foreground">{hint}</p>
+      <Button type="button" variant="outline" className="mt-3" disabled={pending} onClick={() => {
+        setSkill("fin.profile");
+        ask(`Give me a quick review of my finances in ${tab}. Explain the key numbers in plain words, what they mean for me, and one useful next step.`, true);
+      }}>Quick review of {tab}</Button>
+      <p className="mt-2 text-xs text-muted-foreground">Ask for a “quick chat” or “quick review of my finances” to get a short report on this section. Enable Speak replies to hear it.</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {AMELIA_SKILLS.map((item) => (
           <button
@@ -207,7 +214,7 @@ export function AmeliaRail({
           </button>
         ))}
       </div>
-      <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto">
+      <div className="mt-4 min-h-32 flex-1 space-y-3 overflow-y-auto">
         {turns.length === 0 && (
           <p className="text-sm text-muted-foreground">Answers stay on this side of the desk.</p>
         )}
@@ -219,7 +226,7 @@ export function AmeliaRail({
         ))}
       </div>
       <form
-        className="mt-3 flex flex-col gap-2"
+        className="mt-3 flex shrink-0 flex-col gap-2"
         onSubmit={(event) => {
           event.preventDefault();
           ask(question);
@@ -233,6 +240,8 @@ export function AmeliaRail({
           disabled={pending}
           rows={3}
         />
+        <AssistantVoice assistant="Amelia" busy={pending} contextKey={featureId}
+          onDraft={setQuestion} onQuestion={ask} reply={turns.at(-1)?.answer ?? ""} />
         {error && <p className="text-sm text-destructive">{error}</p>}
         <Button type="submit" disabled={pending || !question.trim()}>
           {pending ? "Asking…" : "Ask Amelia"}

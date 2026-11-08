@@ -24,6 +24,22 @@ def login(client, persona="1000"):
     return {"Authorization": "Bearer " + r.json()["token"]}
 
 
+@pytest.mark.parametrize("feature", ["fin.profile", "fin.moneyleaks", "fin.moneymission", "fin.debt", "fin.futureyou", "fin.investments"])
+def test_quick_reviews_use_current_section_evidence(local, monkeypatch, feature):
+    headers = login(local)
+    install_nvidia(monkeypatch, completion)
+    response = local.post("/api/v1/pnc/assistant", headers=headers, json={
+        "feature_id": feature, "question": "Give me a quick review of my finances"})
+    assert response.status_code == 200, response.text
+    evidence = response.json()["evidence"]
+    assert evidence["review_format"] == "quick_review"
+    assert "hypothetical_car" not in evidence
+    if feature == "fin.debt":
+        assert "financial_health" in evidence
+    if feature == "fin.investments":
+        assert evidence["recorded_portfolio"]["client_id"] == 1000
+
+
 def install_nvidia(monkeypatch, handler):
     original = httpx.Client
     monkeypatch.setenv("NVIDIA_API_KEY", "test-secret-never-output")
@@ -118,6 +134,9 @@ def test_money_displays_are_rendered_by_code():
     utilization = next(v for v in facts.values() if v["path"] == "credit_utilization")
     apy = next(v for v in facts.values() if v["path"] == "savings_apy")
     assert checking["display"] == "$1,200.50" and utilization["display"] == "32%" and apy["display"] == "4.25%"
+    report_facts = amelia.facts_for({"debt_payment_to_income": .0072809, "recurring_bills": 1690.84, "target_return": .05})
+    displays = {fact["path"]: fact["display"] for fact in report_facts.values()}
+    assert displays == {"debt_payment_to_income": "0.73%", "recurring_bills": "$1,690.84", "target_return": "5%"}
     valid = {"answer": "Checking is {{f0000}}.", "reasons": [], "evidence_ids": ["f0000"], "limitations": []}
     facts = amelia.facts_for({"checking_balance": 50})
     assert "$50.00" in amelia.validate_explanation(valid, facts)["answer"]

@@ -24,6 +24,7 @@ from app.routers.identity import router as auth_router
 from app.routers.customer_portfolio import router as customer_portfolio_router
 from app.routers.learn import router as learn_router
 from app.routers.solana import router as solana_router
+from app.routers.speech import router as speech_router
 
 
 from app.routers.portfolio import router as portfolio_router
@@ -86,6 +87,7 @@ app.include_router(staff_router)
 app.include_router(portfolio_router)
 app.include_router(views_router)
 app.include_router(solana_router)
+app.include_router(speech_router)
 
 
 @app.get("/")

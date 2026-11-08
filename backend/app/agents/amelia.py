@@ -17,11 +17,15 @@ FEATURES = (
     "fin.profile", "fin.xray", "fin.futureyou", "fin.moneymission", "fin.immune",
     "fin.moneyleaks", "fin.debt", "fin.rewards", "fin.fraud", "fin.coach", "fin.modellab", "fin.investments",
 )
-RATIO_LEAVES = {"credit_utilization", "dti", "debt_to_income", "utilization", "value"}
+RATIO_LEAVES = {"credit_utilization", "dti", "debt_to_income", "utilization", "value", "stocks", "bonds", "foreign",
+                "annualized_return", "total_return", "volatility", "max_drawdown", "risk_budget", "target_return",
+                "investment_volatility", "income_volatility", "debt_payment_to_income"}
 MONEY_MARKERS = (
     "_balance", "_income", "_value", "_payment", "_cost", "_contribution", "_equity",
     "_limit", "safe_spend", "new_payment", "price", "down_payment", "loan_amount",
     "projected_balance_30d", "monthly_payment", "principal",
+    "recurring_bill_total", "subscription_cost_monthly", "known_obligations", "credit_limit_total",
+    "recurring_bills", "monthly_surplus",
 )
 PERCENT_MARKERS = ("_apy", "_apr", "_pct", "_rate", "credit_utilization", "dti", "debt_to_income")
 
@@ -63,12 +67,14 @@ def facts_for(evidence):
                 leaf = _leaf(path)
                 if path.endswith("_cents"):
                     facts[key]["display"] = f"${value / 100:,.2f}"
+                elif ratio or leaf in RATIO_LEAVES:
+                    facts[key]["display"] = f"{value * 100:.2f}".rstrip("0").rstrip(".") + "%"
                 elif any(leaf.endswith(mark) or leaf == mark.lstrip("_") for mark in MONEY_MARKERS):
                     facts[key]["display"] = f"${value:,.2f}"
-                elif ratio or leaf in RATIO_LEAVES:
-                    facts[key]["display"] = f"{value * 100:g}%"
                 elif any(mark in leaf for mark in PERCENT_MARKERS):
                     facts[key]["display"] = f"{value:g}%"
+                elif isinstance(value, float) and value.is_integer():
+                    facts[key]["display"] = f"{value:g}"
     visit(evidence, "")
     return facts
 
@@ -106,6 +112,8 @@ def explain(question, role, feature, evidence):
     model_facts = {
         fact_id: {
             "path": fact["path"],
+            "formatted_as": "currency" if str(fact.get("display", "")).startswith("$") else (
+                "percentage" if str(fact.get("display", "")).endswith("%") else "number_or_text"),
             "value": "{{" + fact_id + "}}" if (
                 isinstance(fact["value"], (int, float)) and not isinstance(fact["value"], bool)
                 or re.search(r"\d", str(fact["value"]))
@@ -130,6 +138,12 @@ def explain(question, role, feature, evidence):
                 "content": PROMPT.read_text() + "\n\nAUTHORIZED_CONTEXT_JSON:\n" + json.dumps({
                     "role": role,
                     "feature": feature,
+                    "response_style": (
+                        "Quick conversational review: three short paragraphs, at most three key figures. "
+                        "Explain what each figure means in everyday life and finish with one practical next step. "
+                        "Do not recite all the fields or repeat the same point in reasons."
+                        if evidence.get("review_format") == "quick_review" else "Answer the specific question concisely."
+                    ),
                     "fact_map": model_facts,
                     "policy": "Synthetic tracker; educational information, not financial advice",
                     "output_schema": Explanation.model_json_schema(),

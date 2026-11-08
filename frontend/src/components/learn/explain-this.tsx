@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCustomerSession } from "@/lib/customer-session";
+import { AssistantVoice } from "@/components/assistant-voice";
 import { WilburReply } from "@/components/learn/wilbur-reply";
 import { Badge } from "@/components/ui/badge";
 import { ExplanationCard } from "@/components/learn/explanation-card";
@@ -21,6 +22,7 @@ export function ExplainThis({
   const session = useCustomerSession();
   const [usePersonal, setUsePersonal] = useState(true);
   const [question, setQuestion] = useState("");
+  const [webSearch, setWebSearch] = useState(true);
   const trackerId = session?.customerId && !session.isStaff ? Number(session.customerId) : undefined;
   const personalAvailable = Boolean(session?.token && trackerId !== undefined && Number.isInteger(trackerId));
   const appliedTracker = usePersonal && personalAvailable ? trackerId : undefined;
@@ -54,6 +56,7 @@ export function ExplainThis({
           question: text,
           tracker_user_id: appliedTracker,
           user_id: learnUserId(),
+          web_search: webSearch,
         });
       if (currentRequest === requestId.current) setResult(response);
     } catch (e) {
@@ -129,10 +132,17 @@ export function ExplainThis({
           <label htmlFor="wilbur-question" className="font-display font-bold">Ask Wilbur</label>
           <Input id="wilbur-question" value={question} onChange={(event) => setQuestion(event.target.value)}
             placeholder="Explain annual percentage yield in plain words" disabled={busy !== null} />
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <input type="checkbox" checked={webSearch} disabled={busy !== null} onChange={(event) => setWebSearch(event.target.checked)} />
+            Look up topics outside the lessons on the web
+          </label>
           <Button type="submit" disabled={busy !== null || !question.trim()}>
             {busy === "custom" ? "Wilbur is thinking..." : "Ask Wilbur"}
           </Button>
         </form>
+        <div className="mb-5"><AssistantVoice assistant="Wilbur" busy={busy !== null}
+          contextKey={`${session?.email}:${appliedTracker ?? "sample"}`} onDraft={setQuestion}
+          onQuestion={(text) => void ask(undefined, text)} reply={result?.wilbur?.answer ?? ""} /></div>
         {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
         {!result && !error && (
           <div className="flex h-full min-h-[280px] items-center justify-center rounded-2xl border border-dashed border-border p-8 text-center text-muted-foreground">
@@ -157,7 +167,7 @@ export function ExplainThis({
               )}
             </div>
             <WilburReply reply={result.wilbur} />
-            <ExplanationCard
+            {(!result.answer_mode || result.answer_mode === "curriculum") && <ExplanationCard
               key={result.question_id ?? "unmatched"}
               explanation={result.explanation}
               onGoDeeper={async () => {
@@ -169,7 +179,7 @@ export function ExplainThis({
                 });
                 return deep.explanation.go_deeper;
               }}
-            />
+            />}
             {result.your_numbers && (
               <details className="rounded-2xl border border-border p-4 text-sm">
                 <summary className="cursor-pointer font-medium">

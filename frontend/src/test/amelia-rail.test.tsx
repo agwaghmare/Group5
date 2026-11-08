@@ -18,6 +18,25 @@ describe("Amelia prompt selection", () => {
   beforeEach(() => vi.mocked(askAmelia).mockReset());
   afterEach(cleanup);
 
+  it.each([
+    ["fin.profile", "My Money"], ["fin.moneyleaks", "Bills"], ["fin.moneymission", "Savings"],
+    ["fin.debt", "Loans & Health"], ["fin.futureyou", "What If"], ["fin.investments", "Investments"],
+  ])("requests a quick review of the active %s section", async (feature, tab) => {
+    vi.mocked(askAmelia).mockResolvedValue(answer);
+    render(<AmeliaRail featureId={feature} hint="Recorded snapshot" />);
+    fireEvent.click(screen.getByRole("button", { name: `Quick review of ${tab}` }));
+    await waitFor(() => expect(askAmelia).toHaveBeenCalledWith(feature, expect.stringContaining(`finances in ${tab}`)));
+  });
+
+  it("routes a spoken quick chat to the current tab even after choosing another skill", async () => {
+    vi.mocked(askAmelia).mockResolvedValue(answer);
+    render(<AmeliaRail featureId="fin.investments" hint="Recorded snapshot" />);
+    fireEvent.click(screen.getByRole("button", { name: "Shock" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Can we have a quick chat about my finances?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ask Amelia" }));
+    await waitFor(() => expect(askAmelia).toHaveBeenCalledWith("fin.investments", expect.stringContaining("quick chat")));
+  });
+
   it("fills Picture for the active tab and waits for submission", async () => {
     vi.mocked(askAmelia).mockResolvedValue(answer);
     render(<AmeliaRail featureId="fin.debt" hint="Recorded tracker" />);

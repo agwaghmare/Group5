@@ -158,11 +158,15 @@ export interface ExplainResult {
   };
   notes: string[];
   prompts?: Prompt[];
+  answer_mode?: "curriculum" | "web" | "general";
   wilbur?: {
     agent: "Wilbur";
     answer: string;
     reasons: string[];
     limitations: string[];
+    sources?: { title: string; url: string; publisher: string }[];
+    google_search_url?: string | null;
+    web_status?: "found" | "unavailable" | "disabled";
   };
 }
 
@@ -260,6 +264,7 @@ export const learnApi = {
     user_id?: string | undefined;
     lesson_id?: string | undefined;
     go_deeper?: boolean | undefined;
+    web_search?: boolean | undefined;
   }) =>
     request<ExplainResult>(readCustomerSession()?.token && !body.go_deeper ? "/learn/wilbur" : "/learn/context/explain", {
       method: "POST",

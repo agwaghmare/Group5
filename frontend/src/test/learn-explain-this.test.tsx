@@ -48,4 +48,20 @@ describe("Learn personal context", () => {
     expect(await screen.findByRole("region", { name: "Wilbur's explanation" })).toBeInTheDocument();
     expect(screen.getByText(/Compounding means/)).toBeInTheDocument();
   });
+
+  it("shows outside-lesson sources without the curriculum fallback card", async () => {
+    vi.mocked(learnApi.explain).mockResolvedValue({
+      matched: true, answer_mode: "web", explanation: {} as never, notes: [],
+      wilbur: { agent: "Wilbur", answer: "Sharpe ratio compares excess return with volatility.", reasons: [], limitations: [],
+        sources: [{ title: "Sharpe ratio", publisher: "Wikipedia", url: "https://en.wikipedia.org/wiki/Sharpe_ratio" }],
+        google_search_url: "https://www.google.com/search?q=sharpe+ratio", web_status: "found" },
+    });
+    open();
+    fireEvent.change(screen.getByLabelText("Ask Wilbur"), { target: { value: "What is Sharpe ratio?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ask Wilbur" }));
+    expect(await screen.findByRole("link", { name: /Sharpe ratio.*Wikipedia/ })).toHaveAttribute("href", "https://en.wikipedia.org/wiki/Sharpe_ratio");
+    expect(screen.getByRole("link", { name: "Search this topic on Google" })).toBeInTheDocument();
+    expect(screen.queryByText("Worked example")).not.toBeInTheDocument();
+    expect(learnApi.explain).toHaveBeenCalledWith(expect.objectContaining({ web_search: true }));
+  });
 });

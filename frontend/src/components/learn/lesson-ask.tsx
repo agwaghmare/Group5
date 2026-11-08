@@ -1,30 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Mic, Square } from "lucide-react";
+import { useState } from "react";
+import { ArrowUp } from "lucide-react";
+import { AssistantVoice } from "@/components/assistant-voice";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ExplanationCard } from "@/components/learn/explanation-card";
 import { WilburReply } from "@/components/learn/wilbur-reply";
 import { learnApi, learnUserId, type ExplainResult } from "@/lib/learn-api";
-
-type SpeechRec = {
-  lang: string;
-  interimResults: boolean;
-  onresult: ((ev: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
-  onerror: (() => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-};
-
-function createRecognition(): SpeechRec | null {
-  if (typeof window === "undefined") return null;
-  const host = window as unknown as {
-    SpeechRecognition?: new () => SpeechRec;
-    webkitSpeechRecognition?: new () => SpeechRec;
-  };
-  const Ctor = host.SpeechRecognition ?? host.webkitSpeechRecognition;
-  return Ctor ? new Ctor() : null;
-}
 
 /** Ask about the open lesson by typing or speaking. Answers come from the Learn API. */
 export function LessonAsk({
@@ -42,18 +23,9 @@ export function LessonAsk({
     "Give me a small example",
   ];
   const [draft, setDraft] = useState("");
-  const [listening, setListening] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ExplainResult | null>(null);
-  const [micReady, setMicReady] = useState(false);
-  const recRef = useRef<SpeechRec | null>(null);
-
-  useEffect(() => {
-    setMicReady(createRecognition() !== null);
-    return () => recRef.current?.stop();
-  }, []);
-
   const ask = async (question: string) => {
     const text = question.trim();
     if (!text || busy) return;
@@ -75,35 +47,6 @@ export function LessonAsk({
     }
   };
 
-  const toggleMic = () => {
-    if (listening) {
-      recRef.current?.stop();
-      setListening(false);
-      return;
-    }
-    const rec = createRecognition();
-    if (!rec) {
-      setError("This browser does not support speech recognition. Type your question instead.");
-      return;
-    }
-    rec.lang = "en-US";
-    rec.interimResults = false;
-    rec.onresult = (ev) => {
-      const said = ev.results[0]?.[0]?.transcript ?? "";
-      if (said) setDraft(said);
-    };
-    rec.onerror = () => setListening(false);
-    rec.onend = () => setListening(false);
-    recRef.current = rec;
-    setError(null);
-    try {
-      rec.start();
-      setListening(true);
-    } catch {
-      setListening(false);
-      setError("The microphone could not start. Type your question instead.");
-    }
-  };
 
   return (
     <section className="space-y-4 rounded-2xl border border-border bg-card/40 p-5">
@@ -113,7 +56,7 @@ export function LessonAsk({
         </p>
         <h2 className="mt-2 font-display text-2xl font-extrabold">A little clarity. Just ask.</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Type or speak a question about this lesson. The answer stays inside this lesson set.
+          Type or speak a finance question. Wilbur can also look up topics beyond this lesson and show sources.
         </p>
       </div>
 
@@ -152,18 +95,6 @@ export function LessonAsk({
           }}
         />
         <Button
-          type="button"
-          variant={listening ? "default" : "outline"}
-          size="icon"
-          className="shrink-0 rounded-full"
-          aria-pressed={listening}
-          aria-label={listening ? "Stop microphone" : "Speak a question"}
-          disabled={!micReady && !listening}
-          onClick={toggleMic}
-        >
-          {listening ? <Square aria-hidden="true" /> : <Mic aria-hidden="true" />}
-        </Button>
-        <Button
           type="submit"
           size="icon"
           className="shrink-0 rounded-full"
@@ -173,11 +104,9 @@ export function LessonAsk({
           <ArrowUp aria-hidden="true" />
         </Button>
       </form>
-      {!micReady && (
-        <p className="text-xs text-muted-foreground">
-          The microphone needs a browser with speech recognition, such as Chrome or Safari.
-        </p>
-      )}
+      <AssistantVoice assistant="Wilbur" busy={busy} contextKey={lessonId}
+        onDraft={setDraft} onQuestion={(text) => void ask(text)}
+        reply={result?.wilbur?.answer ?? result?.explanation.one_sentence ?? ""} />
       {error && <p className="text-sm text-destructive">{error}</p>}
       {busy && <p className="text-sm text-muted-foreground">Thinking…</p>}
       {result && (
@@ -195,7 +124,7 @@ export function LessonAsk({
             )}
           </div>
           <WilburReply reply={result.wilbur} />
-          <ExplanationCard
+          {(!result.answer_mode || result.answer_mode === "curriculum") && <ExplanationCard
             key={result.question_id ?? result.label ?? "ask"}
             explanation={result.explanation}
             onGoDeeper={async () => {
@@ -208,7 +137,7 @@ export function LessonAsk({
               });
               return deep.explanation.go_deeper;
             }}
-          />
+          />}
           {result.notes.map((note) => (
             <p key={note} className="text-xs text-muted-foreground">
               {note}

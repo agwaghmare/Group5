@@ -1,6 +1,7 @@
 """All original tracker columns for the signed-in customer; no Lab Package adapters."""
 from datetime import date
 from decimal import Decimal
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
@@ -232,6 +233,24 @@ def assistant(body: Ask, store=Depends(current_identity)):
     allow_amelia(store, body.feature_id)
     rows = snapshots(store)
     evidence = evidence_for(body.feature_id, rows)
+    if body.feature_id == "fin.investments":
+        from app.routers.customer_portfolio import overview
+        portfolio = overview(store)
+        assessment = portfolio["assessment"]
+        evidence = {"recorded_portfolio": {key: portfolio[key] for key in (
+            "value_cents", "as_of", "allocations", "profile", "holdings", "client_id")},
+            "limitation": "Recorded portfolio only; unsent sliders are not included. Modeled returns are not forecasts."}
+        evidence["recorded_portfolio"]["assessment"] = {key: assessment[key] for key in (
+            "metrics", "risk_capacity", "risk_budget", "flags", "financial_context", "data_as_of", "history_stale", "limitations")}
+    if re.search(r"\bquick\s+(?:chat|review)\b|\breview\s+(?:of\s+)?my\s+finances\b", body.question, re.I):
+        evidence["review_format"] = "quick_review"
+        evidence["review_scope"] = "Recorded snapshot for the active section; unsent slider changes are not included."
+        if body.feature_id == "fin.investments":
+            evidence["recorded_portfolio"]["assessment"].pop("financial_context", None)
+        if body.feature_id == "fin.debt":
+            evidence["financial_health"] = xray_from(rows[-1])
+        if body.feature_id == "fin.futureyou":
+            evidence.pop("hypothetical_car", None)
     from app.agents.amelia import AgentError, explain
     from app.orm.models import AuthSession, User
     original_role, user_id = store.user.role_key, store.user.id

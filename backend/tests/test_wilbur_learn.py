@@ -92,3 +92,34 @@ def test_missing_provider_configuration_names_wilbur(local, monkeypatch):
     response = local.post("/learn/wilbur", headers=headers, json={"question_id": "explain-apy"})
     assert response.status_code == 503
     assert "Wilbur" in response.json()["detail"]
+
+
+@pytest.mark.parametrize("web_search,found", [(True, True), (True, False), (False, False)])
+def test_wilbur_answers_outside_curriculum_with_optional_sources(local, monkeypatch, web_search, found):
+    from app.services import learning_web
+    headers = login(local)
+    searches = []
+
+    def research(question):
+        searches.append(question)
+        return {"query": "sharpe ratio", "status": "found" if found else "unavailable",
+                "google_search_url": "https://www.google.com/search?q=sharpe+ratio",
+                "sources": [{"title": "Sharpe ratio", "publisher": "Wikipedia",
+                             "url": "https://en.wikipedia.org/wiki/Sharpe_ratio",
+                             "summary": "Sharpe ratio compares excess return with volatility."}] if found else []}
+
+    monkeypatch.setattr(learning_web, "lookup", research)
+    calls = provider(monkeypatch)
+    response = local.post("/learn/wilbur", headers=headers, json={
+        "question": "What does Sharpe ratio mean in portfolio risk and return?",
+        "tracker_user_id": 1000, "web_search": web_search})
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["answer_mode"] == ("web" if found else "general")
+    assert bool(data["wilbur"]["sources"]) is found
+    assert data["wilbur"]["web_status"] == ("found" if found else "unavailable" if web_search else "disabled")
+    assert len(searches) == int(web_search)
+    context = json.loads(calls[0]["messages"][0]["content"].split("AUTHORIZED_CONTEXT_JSON:\n")[1])
+    paths = [fact["path"] for fact in context["fact_map"].values()]
+    assert "general_finance_education" in paths
+    assert not any(path.startswith(("recorded_numbers", "curriculum")) for path in paths)

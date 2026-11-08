@@ -46,6 +46,12 @@ def test_profile_and_allocation_previews_recalculate_without_saving():
     high = client.post("/api/v1/pnc/portfolio/preview", headers=headers, json=body)
     assert high.status_code == 200, high.text
     assert high.json()["assessment"]["risk_budget"] > low.json()["assessment"]["risk_budget"]
+    suggestion = high.json()["assessment"]["profile_model"]
+    assert suggestion is not None
+    assert abs(sum(suggestion["allocations"].values()) - 1) < .000001
+    assert suggestion["metrics"]["volatility"] <= high.json()["assessment"]["risk_budget"]
+    assert max(suggestion["allocations"].values()) <= .8
+    assert suggestion["requires_approval"] is True
     with Store() as store:
         account = store.db.get(PortfolioAccount, 1000)
         assert account.value_cents == baseline["value_cents"]

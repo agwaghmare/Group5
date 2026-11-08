@@ -23,3 +23,4 @@ class ExplainRequest(BaseModel):
     user_id: str | None = None
     lesson_id: str | None = None
     go_deeper: bool = False
+    web_search: bool = True

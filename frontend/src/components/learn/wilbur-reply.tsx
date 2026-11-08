@@ -10,6 +10,14 @@ export function WilburReply({ reply }: { reply: ExplainResult["wilbur"] }) {
         {reply.reasons.map((reason, index) => <li key={index}>{reason}</li>)}
       </ul>}
       {reply.limitations.map((limitation, index) => <p key={index} className="text-xs text-muted-foreground">{limitation}</p>)}
+      {reply.sources && reply.sources.length > 0 && <div className="space-y-2 border-t border-border pt-3">
+        <p className="text-xs font-bold">Web sources</p>
+        {reply.sources.map((source) => <a key={source.url} className="block text-sm text-primary underline"
+          href={source.url} target="_blank" rel="noopener noreferrer">{source.title} — {source.publisher}</a>)}
+      </div>}
+      {reply.web_status === "unavailable" && <p className="text-xs text-muted-foreground">General explanation: the live web lookup did not return a source.</p>}
+      {reply.google_search_url && <a className="inline-block text-xs text-primary underline" href={reply.google_search_url}
+        target="_blank" rel="noopener noreferrer">Search this topic on Google</a>}
     </section>
   );
 }

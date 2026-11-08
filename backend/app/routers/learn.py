@@ -369,6 +369,8 @@ def learning_agent(body: ExplainRequest, authorization: str | None = Header(defa
 def wilbur_explain(body: ExplainRequest, authorization: str | None = Header(default=None)) -> dict:
     """Wilbur explains the authorized curriculum and code-computed examples."""
     from app.agents.bessie import AgentError, explain as agent_explain
+    from app.services import learning_web
+    from app.services.explainer import match_question
 
     with Store() as store:
         current_identity(authorization, store)
@@ -385,6 +387,17 @@ def wilbur_explain(body: ExplainRequest, authorization: str | None = Header(defa
             "one_sentence", "analogy", "worked_example", "what_this_means_for_you", "safe_next_step")},
         "recorded_numbers": result.get("your_numbers", {}).get("tracker", {}),
     }
+    research = None
+    followup_text = (body.question or "").lower().strip().rstrip(".?!")
+    followup = body.lesson_id and ("this lesson" in followup_text or followup_text in (
+        "give me a small example", "explain in simple terms", "explain this", "explain monthly cash flow"))
+    outside_lesson = bool(body.question and not match_question(body.question, body.question_id) and not followup)
+    if outside_lesson:
+        research = learning_web.lookup(body.question) if body.web_search else {
+            "query": learning_web.search_topic(body.question), "sources": [], "status": "disabled", "google_search_url": None}
+        evidence = learning_web.educational_evidence(research)
+        result = {"matched": True, "label": body.question, "explanation": result["explanation"],
+                  "answer_mode": "web" if research["sources"] else "general", "notes": []}
     try:
         reply = agent_explain(body.question or result.get("label") or "Explain this lesson in plain words.",
                               role, "learn.explain", evidence, agent="wilbur")
@@ -401,6 +414,11 @@ def wilbur_explain(body: ExplainRequest, authorization: str | None = Header(defa
         if body.customer_id is not None or body.tracker_user_id is not None:
             customer_scope(store, body.tracker_user_id if body.tracker_user_id is not None else body.customer_id)
         store.audit("wilbur_explanation", body.lesson_id or result.get("lesson_id") or "learn")
+    reply = learning_web.clean_reply(reply)
+    if research is not None:
+        reply["sources"] = [{key: source[key] for key in ("title", "url", "publisher")} for source in research["sources"]]
+        reply["google_search_url"] = research["google_search_url"]
+        reply["web_status"] = research["status"]
     return {**result, "wilbur": reply}
 
 

@@ -8,6 +8,9 @@ export interface PortfolioAssessment {
   metrics: { annualized_return: number; volatility: number; max_drawdown: number; total_return: number };
   risk_budget: number; risk_capacity: string; flags: string[]; binding_limits: string[];
   return_history: { date: string; portfolio_index: number; benchmark_index: number }[];
+  profile_model?: { allocations: PortfolioAssessment["allocations"]; metrics: PortfolioAssessment["metrics"];
+    goal_feasible: boolean; same_as_current: boolean; requires_approval: boolean } | null;
+  missing_inputs?: string[];
 }
 export interface CustomerPortfolio {
   client_id: number; value_cents: number; as_of: string;
@@ -35,6 +38,16 @@ export function editableInvestmentProfile(profile: InvestmentProfile): Investmen
 }
 export const previewCustomerPortfolio = (body: { allocations: PortfolioAssessment["allocations"]; profile: InvestmentProfile; investment_cents: number }, signal?: AbortSignal) =>
   request<{ assessment: PortfolioAssessment; preview_only: boolean }>("/preview", body, signal);
+
+export function allocationAmounts(totalCents: number, weights: PortfolioAssessment["allocations"]) {
+  const buckets = ["stocks", "bonds", "foreign"] as const;
+  const parts = buckets.map((bucket) => ({ bucket, raw: totalCents * weights[bucket], cents: Math.floor(totalCents * weights[bucket]) }));
+  let remainder = totalCents - parts.reduce((sum, part) => sum + part.cents, 0);
+  for (const part of [...parts].sort((a, b) => (b.raw - b.cents) - (a.raw - a.cents))) {
+    if (remainder-- > 0) part.cents += 1;
+  }
+  return Object.fromEntries(parts.map((part) => [part.bucket, part.cents])) as Record<typeof buckets[number], number>;
+}
 
 export function investmentProjection(principal: number, monthly: number, annualReturn: number, months: number) {
   const rate = Math.expm1(Math.log1p(annualReturn) / 12);
