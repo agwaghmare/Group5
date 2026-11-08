@@ -19,6 +19,9 @@ import { CheckUnderstanding } from "@/components/learn/check-understanding";
 import { ExplainThis } from "@/components/learn/explain-this";
 import { ExplanationCard } from "@/components/learn/explanation-card";
 import { KnowledgeMapView } from "@/components/learn/knowledge-map";
+import { LearningResources } from "@/components/learn/learning-resources";
+import { LearnRewards } from "@/components/learn/learn-rewards";
+import { useCustomerSession } from "@/lib/customer-session";
 import { LessonAsk } from "@/components/learn/lesson-ask";
 import {
   learnApi,
@@ -43,7 +46,8 @@ export function LearnSection({
   onLessonChange: (id: string | null) => void;
 }) {
   const [userId, setUserId] = useState("local");
-  useEffect(() => setUserId(learnUserId()), []);
+  const session = useCustomerSession();
+  useEffect(() => setUserId(learnUserId()), [session?.email, session?.token]);
 
   const openLesson = (id: string) => {
     onLessonChange(id);
@@ -56,6 +60,7 @@ export function LearnSection({
       onValueChange={(v) => onViewChange(v as LearnView)}
       className="flex min-h-0 flex-1 flex-col"
     >
+      <LearnRewards />
       <TabsList className="mb-6 w-fit">
         <TabsTrigger value="lessons">
           <BookOpen aria-hidden="true" /> Lessons
@@ -297,6 +302,7 @@ function LessonDetail({
         onGoDeeper={() => learnApi.goDeeper(l.id, userId)}
       />
 
+      <LearningResources topicId={l.topic_id} />
       {questions.length > 0 && (
         <CheckUnderstanding
           key={l.id}
@@ -490,14 +496,7 @@ function MapTab({
     window.localStorage.setItem(MAP_SNAPSHOT_KEY, JSON.stringify(snapshot));
     setNote("Map saved in this browser and downloaded as finpilot-knowledge-map.json.");
   };
-  const searchFor = (title: string, site: "reading" | "videos") => {
-    const q = encodeURIComponent(`${title} personal finance explained`);
-    const href =
-      site === "videos"
-        ? `https://www.youtube.com/results?search_query=${q}`
-        : `https://www.google.com/search?q=${q}`;
-    window.open(href, "_blank", "noopener,noreferrer");
-  };
+
 
   return (
     <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
@@ -637,7 +636,6 @@ function MapTab({
           userId={userId}
           titleOf={titleOf}
           onOpen={onOpen}
-          onSearch={searchFor}
         />
       </section>
     </div>
@@ -652,7 +650,6 @@ function ConceptDetail({
   userId,
   titleOf,
   onOpen,
-  onSearch,
 }: {
   node: MapNode | null;
   level: MapLevel;
@@ -661,7 +658,6 @@ function ConceptDetail({
   userId: string;
   titleOf: (id: string) => string;
   onOpen: (id: string) => void;
-  onSearch: (title: string, site: "reading" | "videos") => void;
 }) {
   const locked = node?.status === "locked";
   const lesson = useQuery({
@@ -703,17 +699,9 @@ function ConceptDetail({
         <Button disabled={locked} onClick={() => onOpen(node.id)}>
           {locked ? "Locked" : "Open lesson"}
         </Button>
-        {reading && (
-          <Button variant="outline" onClick={() => onSearch(node.title, "reading")}>
-            Find a reading
-          </Button>
-        )}
-        {videos && (
-          <Button variant="outline" onClick={() => onSearch(node.title, "videos")}>
-            Find a video
-          </Button>
-        )}
+
       </div>
+      <LearningResources topicId={node.topic_id} reading={reading} videos={videos} />
     </div>
   );
 }

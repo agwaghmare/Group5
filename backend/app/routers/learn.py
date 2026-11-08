@@ -26,6 +26,16 @@ from app.services.progress import (
 router = APIRouter(prefix="/learn", tags=["learn"])
 
 
+def learner_id(requested, authorization):
+    if authorization:
+        with Store() as store:
+            current_identity(authorization, store)
+            return "account:" + store.user.id
+    if requested and requested.startswith("account:"):
+        raise HTTPException(401, "Sign in to access account learning progress")
+    return requested
+
+
 def _public_quiz(item: dict) -> dict:
     return {"id": item["id"], "prompt": item["prompt"], "choices": item["choices"]}
 
@@ -119,7 +129,8 @@ def topics() -> dict:
 
 
 @router.get("/lessons")
-def lessons(topic_id: str | None = None, user_id: str | None = None) -> dict:
+def lessons(topic_id: str | None = None, user_id: str | None = None, authorization: str | None = Header(default=None)) -> dict:
+    user_id = learner_id(user_id, authorization)
     progress = get_progress(user_id) if user_id else None
     rows = LESSONS if not topic_id else [lesson for lesson in LESSONS if lesson["topic_id"] == topic_id]
     if topic_id and not rows:
@@ -150,7 +161,8 @@ def _reject_if_locked(lesson: dict, progress: dict | None) -> None:
 
 
 @router.get("/lessons/{lesson_id}")
-def lesson_detail(lesson_id: str, user_id: str | None = None, go_deeper: bool = False) -> dict:
+def lesson_detail(lesson_id: str, user_id: str | None = None, go_deeper: bool = False, authorization: str | None = Header(default=None)) -> dict:
+    user_id = learner_id(user_id, authorization)
     lesson = LESSON_INDEX.get(lesson_id)
     if lesson is None:
         raise HTTPException(status_code=404, detail="Unknown lesson")
@@ -162,7 +174,8 @@ def lesson_detail(lesson_id: str, user_id: str | None = None, go_deeper: bool = 
 
 
 @router.get("/lessons/{lesson_id}/go-deeper")
-def lesson_go_deeper(lesson_id: str, user_id: str | None = None) -> dict:
+def lesson_go_deeper(lesson_id: str, user_id: str | None = None, authorization: str | None = Header(default=None)) -> dict:
+    user_id = learner_id(user_id, authorization)
     lesson = LESSON_INDEX.get(lesson_id)
     if lesson is None:
         raise HTTPException(status_code=404, detail="Unknown lesson")
@@ -175,19 +188,27 @@ def lesson_go_deeper(lesson_id: str, user_id: str | None = None) -> dict:
 
 @router.post("/lessons/{lesson_id}/check-my-understanding")
 @router.post("/lessons/{lesson_id}/quiz")
-def submit_check(lesson_id: str, body: AnswerSubmission) -> dict:
+def submit_check(lesson_id: str, body: AnswerSubmission, authorization: str | None = Header(default=None)) -> dict:
+    user_id = learner_id(body.user_id, authorization)
     lesson = LESSON_INDEX.get(lesson_id)
     if lesson is None:
         raise HTTPException(status_code=404, detail="Unknown lesson")
-    progress = get_progress(body.user_id)
+    progress = get_progress(user_id)
     _reject_if_locked(lesson, progress)
     graded = _grade(lesson["quiz"], body.answers)
-    progress = record_quiz(body.user_id, lesson_id, graded["correct"], graded["total"])
-    return {"control": "check_my_understanding", "lesson_id": lesson_id, **graded, "progress": progress}
+    progress = record_quiz(user_id, lesson_id, graded["correct"], graded["total"])
+    reward = None
+    if authorization:
+        from app.services.learn_rewards import award_quiz
+        with Store() as store:
+            current_identity(authorization, store)
+            reward = award_quiz(store, lesson_id, graded["correct"], graded["total"])
+    return {"control": "check_my_understanding", "lesson_id": lesson_id, **graded, "progress": progress, "reward": reward}
 
 
 @router.get("/map")
-def map_view(user_id: str | None = None) -> dict:
+def map_view(user_id: str | None = None, authorization: str | None = Header(default=None)) -> dict:
+    user_id = learner_id(user_id, authorization)
     progress = get_progress(user_id) if user_id else None
     graph = knowledge_map()
     done = set(progress.get("completed_lessons", [])) if progress else set()
@@ -201,10 +222,10 @@ def map_view(user_id: str | None = None) -> dict:
 
 
 @router.get("/map/{node_id}")
-def map_node(node_id: str, user_id: str | None = None) -> dict:
+def map_node(node_id: str, user_id: str | None = None, authorization: str | None = Header(default=None)) -> dict:
     if node_id not in LESSON_INDEX:
         raise HTTPException(status_code=404, detail="Unknown map node")
-    graph = map_view(user_id)
+    graph = map_view(user_id, authorization)
     node = next(item for item in graph["nodes"] if item["id"] == node_id)
     unlocks = [edge["target"] for edge in graph["edges"] if edge["source"] == node_id]
     return {
@@ -253,22 +274,24 @@ def scenario_detail(scenario_id: str) -> dict:
 
 
 @router.post("/scenarios/{scenario_id}/grade")
-def grade_scenario(scenario_id: str, body: AnswerSubmission) -> dict:
+def grade_scenario(scenario_id: str, body: AnswerSubmission, authorization: str | None = Header(default=None)) -> dict:
+    user_id = learner_id(body.user_id, authorization)
     item = SCENARIO_INDEX.get(scenario_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Unknown scenario")
     graded = _grade(item["questions"], body.answers)
-    progress = record_scenario(body.user_id, scenario_id, graded["correct"], graded["total"])
+    progress = record_scenario(user_id, scenario_id, graded["correct"], graded["total"])
     return {"scenario_id": scenario_id, **graded, "progress": progress}
 
 
 @router.get("/progress/{user_id}")
-def read_progress(user_id: str) -> dict:
-    return get_progress(user_id)
+def read_progress(user_id: str, authorization: str | None = Header(default=None)) -> dict:
+    return get_progress(learner_id(user_id, authorization))
 
 
 @router.put("/progress/{user_id}")
-def write_progress(user_id: str, body: ProgressUpdate) -> dict:
+def write_progress(user_id: str, body: ProgressUpdate, authorization: str | None = Header(default=None)) -> dict:
+    user_id = learner_id(user_id, authorization)
     try:
         return update_progress(user_id, body.preferred_level, body.current_lesson_id)
     except KeyError:
@@ -276,7 +299,8 @@ def write_progress(user_id: str, body: ProgressUpdate) -> dict:
 
 
 @router.post("/progress/{user_id}/lessons/{lesson_id}/complete")
-def mark_complete(user_id: str, lesson_id: str) -> dict:
+def mark_complete(user_id: str, lesson_id: str, authorization: str | None = Header(default=None)) -> dict:
+    user_id = learner_id(user_id, authorization)
     try:
         return complete_lesson(user_id, lesson_id)
     except KeyError:
@@ -296,6 +320,7 @@ def context_prompts(customer_id: str | None = None, tracker_user_id: int | None 
 
 @router.post("/context/explain")
 def context_explain(body: ExplainRequest, authorization: str | None = Header(default=None)) -> dict:
+    user_id = learner_id(body.user_id, authorization)
     if not body.question and not body.question_id:
         raise HTTPException(status_code=400, detail="Send a question or a question_id")
     result = explain(
@@ -310,7 +335,7 @@ def context_explain(body: ExplainRequest, authorization: str | None = Header(def
         lesson = LESSON_INDEX.get(body.lesson_id)
         if lesson is None:
             raise HTTPException(status_code=404, detail="Unknown lesson")
-        progress = get_progress(body.user_id) if body.user_id else None
+        progress = get_progress(user_id) if user_id else None
         _reject_if_locked(lesson, progress)
         example = render_example(lesson["example"])
         result = {
@@ -330,7 +355,7 @@ def context_explain(body: ExplainRequest, authorization: str | None = Header(def
             "prompts": result.get("prompts", []),
         }
     if body.user_id and result.get("matched") and result.get("question_id"):
-        record_view(body.user_id, result["question_id"])
+        record_view(user_id, result["question_id"])
     return result
 
 
@@ -393,3 +418,11 @@ def authorized_context(customer_id, tracker_user_id, authorization):
             raise HTTPException(403, "You may only use your own financial context")
         store.audit("learn_context_read", str(customer.tracker_id))
         return load_context(customer_id, customer.tracker_id, store.db)
+
+
+@router.get("/rewards")
+def learn_rewards(authorization: str | None = Header(default=None)) -> dict:
+    from app.services.learn_rewards import summary
+    with Store() as store:
+        current_identity(authorization, store)
+        return summary(store)

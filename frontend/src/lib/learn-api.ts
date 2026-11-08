@@ -108,6 +108,16 @@ export interface GradeResult {
   score: number;
   questions: GradedQuestion[];
   progress: Progress;
+  reward?: (LearnRewardBalance & { awarded: number; already_earned: boolean }) | null;
+}
+
+export interface LearnRewardBalance {
+  currency: string;
+  balance: number;
+  per_lesson: number;
+  pass_score: number;
+  description: string;
+  earned_lessons: { lesson_id: string; amount: number; earned_at: string }[];
 }
 
 export interface Progress {
@@ -200,6 +210,7 @@ const q = (
 };
 
 export const learnApi = {
+  rewards: () => request<LearnRewardBalance>("/learn/rewards"),
   topics: () => request<{ topics: Topic[] }>("/learn/topics"),
   lessons: (userId: string, topicId?: string) =>
     request<{ lessons: LessonSummary[] }>(
@@ -260,6 +271,8 @@ const USER_KEY = "finpilot.learn.user";
 
 /** A stable local learner id so progress survives reloads without a sign-in. */
 export function learnUserId(): string {
+  const session = readCustomerSession();
+  if (session?.token) return `account:${session.email}`;
   if (typeof window === "undefined") return "local";
   let id = window.localStorage.getItem(USER_KEY);
   if (!id) {

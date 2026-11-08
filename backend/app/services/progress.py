@@ -110,7 +110,7 @@ def record_quiz(user_id: str, lesson_id: str, correct: int, total: int) -> dict:
             "score": round(correct / total, 4) if total else 0,
             "completed_at": _now(),
         }
-        if lesson_id not in row["completed_lessons"]:
+        if total > 0 and correct / total >= 0.8 and lesson_id not in row["completed_lessons"]:
             row["completed_lessons"].append(lesson_id)
         row["updated_at"] = _now()
         data[user_id] = row

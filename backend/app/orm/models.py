@@ -105,6 +105,15 @@ class DataImport(Base):
     columns: Mapped[list] = mapped_column(JSON)
 
 
+class LearnReward(Base):
+    __tablename__ = "learn_rewards"
+    __table_args__ = (CheckConstraint("amount_tenths = 1", name="lesson_reward_tenth"),)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    lesson_id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    amount_tenths: Mapped[int] = mapped_column(Integer, default=1)
+    earned_at: Mapped[str] = mapped_column(String(40))
+
+
 class Record:
     """Versioned/domain JSON documents; IDs and ownership remain relational."""
     id: Mapped[str] = mapped_column(String(100), primary_key=True)
