@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { useCustomerSession } from "@/lib/customer-session";
+import { savingsTransfer, trimmedBills, savingsGoal, loanPlan, projectCash } from "@/lib/finance-scenarios";
 import { askAmelia, loadTracker, money, num, pct, type Snapshot } from "@/lib/finance-api";
 
 export type FinanceView = "money" | "bills" | "goals" | "health" | "whatif";
@@ -80,11 +81,11 @@ export function FinanceSection({
           <p>{tracker.error instanceof Error ? tracker.error.message : "Tracker data is unavailable."}</p>
         </div>
       )}
-      {latest && view === "money" && <MoneyView latest={latest} history={history} />}
-      {latest && view === "bills" && <BillsView latest={latest} history={history} />}
-      {latest && view === "goals" && <GoalsView latest={latest} history={history} />}
-      {latest && view === "health" && <HealthView latest={latest} />}
-      {latest && view === "whatif" && <WhatIfView latest={latest} />}
+      {latest && view === "money" && <MoneyView key={`${latest.user_id}:${latest.date}`} latest={latest} history={history} />}
+      {latest && view === "bills" && <BillsView key={`${latest.user_id}:${latest.date}`} latest={latest} history={history} />}
+      {latest && view === "goals" && <GoalsView key={`${latest.user_id}:${latest.date}`} latest={latest} history={history} />}
+      {latest && view === "health" && <HealthView key={`${latest.user_id}:${latest.date}`} latest={latest} />}
+      {latest && view === "whatif" && <WhatIfView key={`${latest.user_id}:${latest.date}`} latest={latest} />}
     </div>
   );
 }
@@ -239,83 +240,78 @@ export function AmeliaRail({
 
 function MoneyView({ latest, history }: { latest: Snapshot; history: Snapshot[] }) {
   const [extraSave, setExtraSave] = useState(0);
-  const available = num(latest.available_balance) - extraSave;
+  const scenario = savingsTransfer(latest, extraSave);
+  const maximum = Math.min(2000, Math.floor(scenario.transferable / 25) * 25);
   const rows = useMemo(() => {
     const past = history.map((row) => ({
       label: row.date.slice(2, 7),
       Checking: Math.round(num(row.checking_balance)),
       Savings: Math.round(num(row.savings_balance)),
     }));
-    const checking = num(latest.checking_balance);
-    const savings = num(latest.savings_balance);
-    const ahead = Array.from({ length: 6 }, (_, index) => ({
-      label: `+${index + 1}`,
-      Checking: Math.round(checking - extraSave * (index + 1)),
-      Savings: Math.round(savings + extraSave * (index + 1)),
-    }));
-    return [...past, ...ahead];
+    return [...past, ...savingsTransfer(latest, extraSave).points];
   }, [history, latest, extraSave]);
 
   return (
     <Desk
-      eyebrow={`Available on ${latest.date}`}
-      figure={money(available)}
-      note={`After setting aside ${money(extraSave)}. Projected in 30 days: ${money(num(latest.projected_balance_30d) - extraSave)}.`}
-      sliders={<MoneySlider label="Extra monthly savings" value={extraSave} min={0} max={2000} step={25} onChange={setExtraSave} />}
+      eyebrow={`Available after transfer - snapshot ${latest.date}`}
+      figure={money(scenario.available)}
+      note={`After moving ${money(scenario.transfer)} from checking to savings. Projected available in 30 days: ${money(scenario.projected30d)}.`}
+      sliders={<MoneySlider label="Extra monthly savings" value={scenario.transfer} min={0} max={maximum} step={25} onChange={setExtraSave} />}
       stats={[
-        ["Checking", money(latest.checking_balance)],
-        ["Savings", money(latest.savings_balance)],
+        ["Checking", money(scenario.checking)],
+        ["Savings", money(scenario.savings)],
         ["Portfolio", money(latest.portfolio_value)],
         ["Home equity", money(latest.home_equity)],
       ]}
     >
       <TrendChart
-        title="Balances on the tracker"
+        title="Recorded history and monthly savings transfers"
         data={rows}
         lines={[
           { key: "Checking", color: "var(--primary)" },
           { key: "Savings", color: "var(--destructive)" },
         ]}
       />
+      <p className="text-xs text-muted-foreground">
+        Cards show the first transfer in this what-if. Portfolio and home equity are unaffected by a checking-to-savings transfer.
+        Available cash keeps the tracker's recorded difference from checking.
+        Future points repeat the transfer until available cash is used up; they exclude future pay, spending, and interest.
+        Recorded history stays unchanged. This does not move money in your account.
+      </p>
     </Desk>
   );
 }
 
 function BillsView({ latest, history }: { latest: Snapshot; history: Snapshot[] }) {
   const income = num(latest.monthly_income);
-  const bills = num(latest.recurring_bill_total);
-  const subs = num(latest.subscription_cost_monthly);
   const debt = num(latest.minimum_debt_payment);
   const [cut, setCut] = useState(0);
-  const committed = Math.max(0, bills + subs + debt - cut);
-  const rows = useMemo(
-    () =>
-      history.map((row) => ({
-        label: row.date.slice(2, 7),
-        Bills: Math.max(0, Math.round(num(row.recurring_bill_total) - cut)),
-        Subscriptions: Math.round(num(row.subscription_cost_monthly)),
-        Debt: Math.round(num(row.minimum_debt_payment)),
-      })),
-    [history, cut],
-  );
+  const plan = trimmedBills(latest, cut);
+  const rows = useMemo(() => [
+    ...history.map((row) => ({
+      label: row.date.slice(2, 7), Bills: num(row.recurring_bill_total),
+      Subscriptions: num(row.subscription_cost_monthly), Debt: num(row.minimum_debt_payment),
+    })),
+    { label: "What-if", Bills: plan.bills, Subscriptions: plan.subscriptions, Debt: plan.debt },
+  ], [history, plan.bills, plan.subscriptions, plan.debt]);
 
   return (
     <Desk
       eyebrow="Committed this month"
-      figure={money(committed)}
-      note={`${money(income - committed)} of ${money(income)} income remains after bills, subscriptions, and the minimum debt payment.`}
+      figure={money(plan.committed)}
+      note={`${money(plan.remaining)} of ${money(income)} income remains after trimming ${money(plan.cut)} from bills and subscriptions. Minimum debt payments stay fixed.`}
       sliders={
-        <MoneySlider label="Bills you could trim" value={cut} min={0} max={Math.max(100, Math.round(bills + subs))} step={10} onChange={setCut} />
+        <MoneySlider label="Bills you could trim" value={plan.cut} min={0} max={Math.floor(plan.maximumCut / 10) * 10} step={10} onChange={setCut} />
       }
       stats={[
-        ["Recurring bills", money(bills)],
-        ["Subscriptions", money(subs)],
+        ["Recurring bills", money(plan.bills)],
+        ["Subscriptions", money(plan.subscriptions)],
         ["Minimum debt", money(debt)],
         ["Delays / overdrafts", `${num(latest.bill_payment_delay_count)} / ${num(latest.overdraft_count_90d)}`],
       ]}
     >
       <TrendChart
-        title="What the tracker recorded"
+        title="Recorded bills and proposed monthly costs"
         data={rows}
         lines={[
           { key: "Bills", color: "var(--primary)" },
@@ -330,12 +326,10 @@ function BillsView({ latest, history }: { latest: Snapshot; history: Snapshot[] 
 function GoalsView({ latest, history }: { latest: Snapshot; history: Snapshot[] }) {
   const current = num(latest.emergency_fund_months);
   const savings = num(latest.savings_balance);
-  const [target, setTarget] = useState(Math.max(6, Math.ceil(current)));
-  const [monthly, setMonthly] = useState(Math.round(num(latest.monthly_savings_contribution)));
-  const gapMonths = Math.max(0, target - current);
-  const monthlyBurn = current > 0 ? savings / current : num(latest.monthly_income);
-  const dollarsShort = gapMonths * monthlyBurn;
-  const monthsToTarget = monthly > 0 ? Math.ceil(dollarsShort / monthly) : null;
+  const [target, setTarget] = useState(Math.min(12, Math.max(6, Math.ceil(current))));
+  const [monthly, setMonthly] = useState(Math.min(2000, Math.max(0, Math.round(num(latest.monthly_savings_contribution) / 25) * 25)));
+  const goal = savingsGoal(latest, target, monthly);
+  const { monthlyBurn, dollarsShort, monthsToTarget } = goal;
   const rows = useMemo(() => {
     const targetDollars = monthlyBurn * target;
     const past = history.map((row) => ({
@@ -353,13 +347,15 @@ function GoalsView({ latest, history }: { latest: Snapshot; history: Snapshot[] 
 
   return (
     <Desk
-      eyebrow="Emergency fund"
+      eyebrow="Current emergency coverage"
       figure={`${current.toFixed(1)} mo`}
       note={
-        monthsToTarget === null
-          ? "Set a contribution above zero to estimate the wait."
-          : gapMonths === 0
+        !goal.basisAvailable
+          ? "Recorded expenses are missing, so coverage and time to target cannot be estimated."
+          : monthsToTarget === 0
             ? "This snapshot already meets that coverage."
+            : monthsToTarget === null
+              ? "Set a contribution above zero to estimate the wait."
             : `${money(dollarsShort)} short. At ${money(monthly)} a month, about ${monthsToTarget} ${monthsToTarget === 1 ? "month" : "months"}.`
       }
       sliders={
@@ -369,20 +365,24 @@ function GoalsView({ latest, history }: { latest: Snapshot; history: Snapshot[] 
         </>
       }
       stats={[
-        ["Savings balance", money(savings)],
-        ["Streak", `${num(latest.savings_streak_months)} mo`],
-        ["APY", `${num(latest.savings_apy).toFixed(2)}%`],
-        ["Retirement", money(latest.retirement_contribution)],
+        ["Savings after one month", money(goal.afterOneMonth)],
+        ["Target reserve", goal.basisAvailable ? money(goal.targetDollars) : "Unavailable"],
+        ["Months to target", goal.basisAvailable ? (monthsToTarget === null ? "Set contribution" : String(monthsToTarget)) : "Unavailable"],
+        ["Recorded APY", `${num(latest.savings_apy).toFixed(2)}%`],
       ]}
     >
       <TrendChart
-        title="Savings balance"
+        title="Recorded savings and contribution-only projection"
         data={rows}
         lines={[
           { key: "Savings", color: "var(--primary)" },
           { key: "Target", color: "var(--destructive)" },
         ]}
       />
+      <p className="text-xs text-muted-foreground">
+        Projections add the selected contribution each month and exclude interest and withdrawals.
+        Current coverage and the recorded APY stay tied to the snapshot.
+      </p>
     </Desk>
   );
 }
@@ -390,22 +390,16 @@ function GoalsView({ latest, history }: { latest: Snapshot; history: Snapshot[] 
 function HealthView({ latest }: { latest: Snapshot }) {
   const income = num(latest.monthly_income);
   const living = num(latest.recurring_bill_total) + num(latest.subscription_cost_monthly);
-  const [amount, setAmount] = useState(15000);
-  const [apr, setApr] = useState(12);
-  const [months, setMonths] = useState(48);
+  const debt = num(latest.total_debt_balance);
+  const initialAmount = Math.max(0, debt);
+  const initialApr = Math.max(0, num(latest.weighted_avg_apr));
+  const recordedTerm = num(latest.remaining_loan_term_months);
+  const initialMonths = recordedTerm > 0 ? Math.round(recordedTerm) : 48;
+  const [amount, setAmount] = useState(initialAmount);
+  const [apr, setApr] = useState(initialApr);
+  const [months, setMonths] = useState(initialMonths);
   const [extra, setExtra] = useState(0);
   const [incomeCut, setIncomeCut] = useState(0);
-  const [seeded, setSeeded] = useState(false);
-
-  useEffect(() => {
-    if (seeded) return;
-    const debt = num(latest.total_debt_balance);
-    setAmount(debt >= 500 ? Math.round(debt / 100) * 100 : 15000);
-    setApr(Math.min(24, Math.max(0, Math.round(num(latest.weighted_avg_apr) * 2) / 2)));
-    const term = num(latest.remaining_loan_term_months);
-    setMonths(term >= 12 ? Math.min(84, Math.round(term / 6) * 6) : 48);
-    setSeeded(true);
-  }, [latest, seeded]);
 
   const plan = useMemo(
     () => loanPlan(amount, apr, months, extra, income * (1 - incomeCut / 100), living),
@@ -414,21 +408,21 @@ function HealthView({ latest }: { latest: Snapshot }) {
 
   return (
     <Desk
-      eyebrow="Contract payment"
-      figure={money(plan.payment, 0)}
+      eyebrow="Monthly loan payment including extra"
+      figure={money(plan.totalPayment, 0)}
       note={plan.payoff === null ? "This payment does not cover interest, so the balance would not fall." : `${money(plan.interest)} total interest · payoff in ${plan.payoff} months.`}
       sliders={
         <>
-          <MoneySlider label="Loan amount" value={amount} min={1000} max={50000} step={500} onChange={setAmount} />
-          <MoneySlider label="APR" value={apr} min={0} max={24} step={0.5} suffix="%" onChange={setApr} />
-          <MoneySlider label="Loan months" value={months} min={12} max={84} step={6} suffix=" mo" onChange={setMonths} />
+          <MoneySlider label="Loan amount" value={amount} min={0} max={Math.max(50000, initialAmount)} step={100} onChange={setAmount} />
+          <MoneySlider label="APR" value={apr} min={0} max={Math.max(24, initialApr)} step={0.1} suffix="%" onChange={setApr} />
+          <MoneySlider label="Loan months" value={months} min={1} max={Math.max(84, initialMonths)} step={1} suffix=" mo" onChange={setMonths} />
           <MoneySlider label="Extra monthly payment" value={extra} min={0} max={1000} step={25} onChange={setExtra} />
           <MoneySlider label="Income reduction" value={incomeCut} min={0} max={80} step={5} suffix="%" onChange={setIncomeCut} />
         </>
       }
       stats={[
         ["Total interest", money(plan.interest)],
-        ["Debt to income", plan.dti === null ? "—" : pct(plan.dti)],
+        ["Scheduled payment / income", plan.dti === null ? "—" : pct(plan.dti)],
         ["Monthly surplus", money(plan.surplus)],
         ["Payoff", plan.payoff === null ? "—" : `${plan.payoff} mo`],
       ]}
@@ -439,7 +433,8 @@ function HealthView({ latest }: { latest: Snapshot }) {
         area={{ key: "Balance", color: "var(--primary)" }}
       />
       <p className="text-xs text-muted-foreground">
-        Starts from this account’s debt, rate, term, and income. The payment is a standard fixed schedule plus any extra you add. It is not a credit offer.
+        This what-if models one fixed-rate loan using recorded debt, rate, term, and income when available.
+        It excludes fees and other loan payments. Extra payments reduce principal. It is not a credit offer.
       </p>
     </Desk>
   );
@@ -483,7 +478,7 @@ function WhatIfView({ latest }: { latest: Snapshot }) {
 
   return (
     <Desk
-      eyebrow="Lowest balance"
+      eyebrow="Lowest available balance"
       figure={money(forecast.lowest)}
       note={`Ending ${money(forecast.ending)}. First shortfall: ${forecast.shortfall ?? "none"}. Baseline keeps today’s income and bills.`}
       sliders={
@@ -524,7 +519,9 @@ function WhatIfView({ latest }: { latest: Snapshot }) {
         ]}
       />
       <p className="text-xs text-muted-foreground">
-        Each point spends a share of recorded bills and adds a paycheck on the tracker’s pay cadence. Income reduction, higher living costs, a one-time emergency, and a delayed paycheck change only the green line.
+        This simplified what-if spreads monthly bills and fixed minimum debt payments over thirty days and estimates paychecks
+        from the recorded cadence. Higher living costs affect bills and subscriptions. Income cuts, an emergency, and payday
+        delays affect the scenario; the baseline is unchanged.
       </p>
     </Desk>
   );
@@ -657,7 +654,7 @@ function MoneySlider({
         <Label className="text-xs text-muted-foreground">{label}</Label>
         <span className="font-sans text-sm font-medium tabular-nums text-foreground">{shown}</span>
       </div>
-      <Slider value={[value]} min={min} max={max} step={step} onValueChange={(next) => onChange(next[0] ?? min)} aria-label={label} />
+      <Slider value={[value]} min={min} max={max > min ? max : min + step} disabled={max <= min} step={step} onValueChange={(next) => onChange(next[0] ?? min)} aria-label={label} />
     </div>
   );
 }
@@ -666,99 +663,4 @@ function shortMoney(value: number) {
   const abs = Math.abs(value);
   if (abs >= 1000) return `${value < 0 ? "-" : ""}$${Math.round(abs / 100) / 10}k`;
   return `$${Math.round(value)}`;
-}
-
-function payInterval(frequency: string) {
-  const value = frequency.toLowerCase();
-  if (value.includes("bi")) return 14;
-  if (value.includes("week")) return 7;
-  if (value.includes("semi")) return 15;
-  return 30;
-}
-
-function projectCash(
-  latest: Snapshot,
-  input: { days: number; incomeCut: number; livingUp: number; emergency: number; delay: number },
-) {
-  const start = num(latest.available_balance);
-  const monthlyIncome = num(latest.monthly_income);
-  const monthlyLiving = num(latest.recurring_bill_total) + num(latest.subscription_cost_monthly) + num(latest.minimum_debt_payment);
-  const interval = payInterval(latest.pay_frequency);
-  const origin = new Date(`${latest.date}T00:00:00`);
-  const walk = (shock: boolean) => {
-    let balance = start - (shock ? input.emergency : 0);
-    let lowest = balance;
-    let shortfall: string | null = null;
-    const points = [balance];
-    const daily = (monthlyLiving / 30) * (shock ? 1 + input.livingUp / 100 : 1);
-    const paycheck = (monthlyIncome / (30 / interval)) * (shock ? 1 - input.incomeCut / 100 : 1);
-    const wait = shock ? input.delay : 0;
-    for (let day = 1; day <= input.days; day += 1) {
-      balance -= daily;
-      if (day > wait && (day - wait) % interval === 0) balance += paycheck;
-      if (balance < lowest) lowest = balance;
-      if (balance < 0 && !shortfall) {
-        const when = new Date(origin);
-        when.setDate(when.getDate() + day);
-        shortfall = `${when.getMonth() + 1}/${when.getDate()}`;
-      }
-      points.push(balance);
-    }
-    return { points, lowest, ending: balance, shortfall };
-  };
-
-  const scenario = walk(true);
-  const baseline = walk(false);
-  const slots = 16;
-  return {
-    lowest: scenario.lowest,
-    ending: scenario.ending,
-    shortfall: scenario.shortfall,
-    points: Array.from({ length: slots }, (_, index) => {
-      const day = Math.round((index / (slots - 1)) * input.days);
-      const when = new Date(origin);
-      when.setDate(when.getDate() + day);
-      return {
-        label: `${when.getMonth() + 1}/${when.getDate()}`,
-        Scenario: Math.round(scenario.points[day] ?? scenario.ending),
-        Baseline: Math.round(baseline.points[day] ?? baseline.ending),
-      };
-    }),
-  };
-}
-
-function loanPlan(principal: number, apr: number, term: number, extra: number, income: number, living: number) {
-  const rate = apr / 100 / 12;
-  const payment = rate === 0 ? principal / term : (principal * rate * (1 + rate) ** term) / ((1 + rate) ** term - 1);
-  let balance = principal;
-  let interest = 0;
-  let payoff: number | null = null;
-  const series = [balance];
-  for (let month = 1; month <= term + 240 && balance > 1; month += 1) {
-    const charge = balance * rate;
-    const due = payment + extra;
-    if (due <= charge && rate > 0) break;
-    const paid = Math.min(balance + charge, due);
-    interest += Math.min(charge, paid);
-    balance = Math.max(0, balance + charge - paid);
-    if (balance <= 1) {
-      balance = 0;
-      payoff = month;
-    }
-    series.push(balance);
-    if (balance === 0) break;
-  }
-  const slots = 24;
-  const points = Array.from({ length: slots + 1 }, (_, index) => {
-    const month = Math.round((index / slots) * term);
-    return { label: String(month), Balance: Math.round(series[Math.min(month, series.length - 1)] ?? 0) };
-  });
-  return {
-    payment,
-    interest,
-    payoff,
-    dti: income > 0 ? payment / income : null,
-    surplus: income - living - payment - extra,
-    points,
-  };
 }
