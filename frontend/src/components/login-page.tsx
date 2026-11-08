@@ -2,7 +2,9 @@ import { useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { writeCustomerSession } from "@/lib/customer-session";
+import { writeCustomerSession, type CustomerSession } from "@/lib/customer-session";
+import { setStoredCustomerId } from "@/lib/finance-api";
+import { writeStaffToken } from "@/lib/staff-api";
 
 const KEYWORDS = ["Home", "APR", "Finance", "Learn", "Credit", "Savings", "Budget", "Equity"];
 
@@ -84,6 +86,7 @@ export function LoginPage() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [googlePending, setGooglePending] = useState(false);
+  const [pending, setPending] = useState(false);
   const [docking, setDocking] = useState(false);
 
   const dockThen = (kind: "customer" | "employee", go: () => void) => {
@@ -111,24 +114,73 @@ export function LoginPage() {
     node.addEventListener("transitionend", finish);
   };
 
-  const enterCustomer = (address: string, provider: "email" | "google") => {
-    writeCustomerSession({ email: address, provider });
+  const enterCustomer = (session: CustomerSession) => {
+    writeStaffToken(null);
+    writeCustomerSession(session);
+    if (session.customerId) setStoredCustomerId(session.customerId);
     dockThen("customer", () => void navigate({ to: "/" }));
+  };
+
+  const enterStaff = (session: CustomerSession) => {
+    writeCustomerSession(session);
+    writeStaffToken(session.token ?? null);
+    dockThen("employee", () => void navigate({ to: "/employee" }));
   };
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     const id = email.trim().toLowerCase();
-    if (!id) {
-      setError("Type customer or employee.");
+    if (!id || docking || pending) return;
+    const address =
+      id === "customer" ? "customer1000@example.test" : id === "employee" ? "e001@example.test" : id;
+    if (!address.includes("@")) {
+      setError("Use an account email, such as customer1000@example.test or e001@example.test.");
       return;
     }
     setError(null);
-    if (id === "employee") {
-      dockThen("employee", () => void navigate({ to: "/employee" }));
-      return;
-    }
-    enterCustomer(id === "customer" ? "customer" : id, "email");
+    setPending(true);
+    void fetch("/api/v1/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ email: address, password: "demo" }),
+    })
+      .then(async (response) => {
+        const payload = (await response.json().catch(() => ({}))) as {
+          detail?: string;
+          token?: string;
+          user?: {
+            email: string;
+            role: string;
+            role_label: string;
+            display_name: string;
+            customer_id: string | null;
+            employee_id: string | null;
+            is_staff: boolean;
+          };
+        };
+        if (!response.ok || !payload.user || !payload.token) {
+          setError(typeof payload.detail === "string" ? payload.detail : "That email is not a FinPilot account.");
+          setPending(false);
+          return;
+        }
+        const session: CustomerSession = {
+          email: payload.user.email,
+          provider: "email",
+          role: payload.user.role,
+          roleLabel: payload.user.role_label,
+          displayName: payload.user.display_name,
+          customerId: payload.user.customer_id,
+          employeeId: payload.user.employee_id,
+          token: payload.token,
+          isStaff: payload.user.is_staff,
+        };
+        if (payload.user.is_staff) enterStaff(session);
+        else enterCustomer(session);
+      })
+      .catch(() => {
+        setError("The sign-in service is not reachable.");
+        setPending(false);
+      });
   };
 
   const google = () => {
@@ -146,7 +198,7 @@ export function LoginPage() {
         setError("Google did not return an email.");
         return;
       }
-      enterCustomer(address, "google");
+      enterCustomer({ email: address, provider: "google" });
     };
     const start = () => {
       const googleApi = window.google?.accounts?.id;
@@ -185,9 +237,9 @@ export function LoginPage() {
       <form onSubmit={submit} className={`login-card relative z-10 w-full max-w-sm rounded-[2rem] border border-border bg-background p-6 shadow-glow ${docking ? "is-docking" : ""}`}>
         <p className="font-display text-2xl font-extrabold">FIN<span className="text-primary">PILOT</span></p>
         <h1 className="mt-2 font-display text-3xl font-extrabold leading-none">Sign in</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Type customer or employee. No password for now.</p>
+        <p className="mt-2 text-sm text-muted-foreground">Each email opens that account. Customers use customer1000@example.test and up. Employees use e001@example.test through e008@example.test.</p>
         <label className="mt-4 block text-sm" htmlFor="login-email">
-          Sign in
+          Email
           <Input
             id="login-email"
             className="mt-1"
@@ -195,11 +247,11 @@ export function LoginPage() {
             autoComplete="username"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="customer or employee"
+            placeholder="customer1000@example.test"
           />
         </label>
         {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
-        <Button type="submit" className="mt-4 w-full">Continue</Button>
+        <Button type="submit" className="mt-4 w-full" disabled={pending || docking}>{pending ? "Checking account…" : "Continue"}</Button>
         <Button type="button" variant="outline" className="mt-2 w-full" disabled={googlePending} onClick={google}>
           {googlePending ? "Opening Google…" : "Continue with Google"}
         </Button>

@@ -24,7 +24,7 @@ const SECTIONS: {
   {
     name: "Finance",
     title: "See the whole runway.",
-    body: "X-Ray your health indicators, cash flow, debt payoff paths, goals and purchase what-ifs — from your own PNC demo data.",
+    body: "Balances, bills, savings, and debt from the synthetic tracker for the account you signed in with.",
     to: "/finance",
     cta: "Open Finance",
   },

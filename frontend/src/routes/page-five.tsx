@@ -16,25 +16,42 @@ export const Route = createFileRoute("/page-five")({
   component: PageFive,
 });
 
+function wheelHome() {
+  const pad = window.innerWidth >= 768 ? 24 : 16;
+  const size = 192;
+  const edge = pad - 8;
+  return { x: edge + size / 2, y: window.innerHeight - edge - size / 2 };
+}
+
 function PageFive() {
-  const [returning, setReturning] = useState(false);
+  const [origin, setOrigin] = useState<{ x: number; y: number } | null>(null);
   const navigate = useNavigate();
   return (
     <RequireCustomer>
     <>
-    {returning && <div className="pointer-events-none fixed inset-0" aria-hidden="true" inert><LandingPage /></div>}
-    <div
-      className={`relative flex h-dvh flex-col overflow-hidden bg-background p-4 md:p-6 ${returning ? "wheel-page-return pointer-events-none" : ""}`}
-      onAnimationEnd={(e) => {
-        if (returning && e.target === e.currentTarget) void navigate({ to: "/" });
-      }}
-    >
-      <FinpilotHeader miniWheel onWheelReturn={() => setReturning(true)} />
-      <main className="fifth-page-enter flex min-h-0 flex-1 flex-col justify-center rounded-[2rem] border border-border px-8 md:px-20">
-        <p className="mb-4 font-display text-sm font-bold uppercase text-primary">05 — FINPILOT</p>
-        <h1 className="font-display text-5xl font-extrabold md:text-7xl">Page Five</h1>
-      </main>
-    </div>
+    {origin && (
+      <div className="pointer-events-none fixed inset-0 z-40" aria-hidden="true" inert>
+        <LandingPage />
+      </div>
+    )}
+    {!origin && (
+      <div className="relative flex h-dvh flex-col overflow-hidden bg-background p-4 md:p-6">
+        <FinpilotHeader miniWheel onWheelReturn={() => setOrigin(wheelHome())} />
+        <main className="fifth-page-enter flex min-h-0 flex-1 flex-col justify-center rounded-[2rem] border border-border px-8 md:px-20">
+          <p className="mb-4 font-display text-sm font-bold uppercase text-primary">05 — FINPILOT</p>
+          <h1 className="font-display text-5xl font-extrabold md:text-7xl">Page Five</h1>
+        </main>
+      </div>
+    )}
+    {origin && (
+      <div
+        className="wheel-page-return-ring"
+        style={{ left: origin.x, top: origin.y }}
+        onAnimationEnd={(event) => {
+          if (event.target === event.currentTarget) void navigate({ to: "/" });
+        }}
+      />
+    )}
     </>
     </RequireCustomer>
   );

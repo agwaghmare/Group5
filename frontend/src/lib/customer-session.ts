@@ -5,6 +5,13 @@ const KEY = "finpilot.customer";
 export interface CustomerSession {
   email: string;
   provider: "email" | "google";
+  role?: string;
+  roleLabel?: string;
+  displayName?: string;
+  customerId?: string | null;
+  employeeId?: string | null;
+  token?: string;
+  isStaff?: boolean;
 }
 
 const listeners = new Set<() => void>();
