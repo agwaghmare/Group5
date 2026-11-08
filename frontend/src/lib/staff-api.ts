@@ -61,6 +61,17 @@ export function writeStaffToken(token: string | null) {
 
 function detailMessage(detail: unknown) {
   if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const text = detail
+      .map((item) =>
+        item && typeof item === "object" && "msg" in item
+          ? String(item.msg)
+          : String(item),
+      )
+      .filter(Boolean)
+      .join(" ");
+    if (text) return text;
+  }
   if (detail && typeof detail === "object" && "message" in detail) {
     return String((detail as { message: unknown }).message);
   }

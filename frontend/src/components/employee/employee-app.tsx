@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { writeCustomerSession } from "@/lib/customer-session";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -7,6 +7,8 @@ import { FinpilotHeader } from "@/components/finpilot-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { rememberFifth } from "@/lib/fifth-page";
+import { useCenterDrag } from "@/lib/use-center-drag";
 import {
   DECISIONS,
   ROLE_LABEL,
@@ -33,11 +35,13 @@ function PanelState({
   loading,
   error,
   empty,
+  emptyText = "Nothing is assigned yet.",
   children,
 }: {
   loading: boolean;
   error: unknown;
   empty?: boolean;
+  emptyText?: string;
   children: React.ReactNode;
 }) {
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -56,9 +60,7 @@ function PanelState({
   if (error)
     return <p className="text-sm text-destructive">{messageOf(error)}</p>;
   if (empty)
-    return (
-      <p className="text-sm text-muted-foreground">Nothing is assigned yet.</p>
-    );
+    return <p className="text-sm text-muted-foreground">{emptyText}</p>;
   return <>{children}</>;
 }
 
@@ -90,17 +92,20 @@ function EmployeeWheel({
   tabs,
   progress,
   onSelect,
+  onCenter,
 }: {
   tabs: StaffTab[];
   progress: number;
   onSelect: (index: number) => void;
+  onCenter: () => void;
 }) {
-  const step = 360 / tabs.length;
+  const step = 360 / Math.max(tabs.length, 1);
   const active = Math.round(progress);
   const size = 210;
   const c = size / 2;
   const rOut = 100;
   const rIn = 52;
+  const drag = useCenterDrag(onCenter);
   const arc = (i: number) => {
     const a0 = ((i * step - step / 2 - 90 + 2) * Math.PI) / 180;
     const a1 = ((i * step + step / 2 - 90 - 2) * Math.PI) / 180;
@@ -109,64 +114,84 @@ function EmployeeWheel({
     return `M ${p(rOut, a0)} A ${rOut} ${rOut} 0 0 1 ${p(rOut, a1)} L ${p(rIn, a1)} A ${rIn} ${rIn} 0 0 0 ${p(rIn, a0)} Z`;
   };
   return (
-    <div
-      className="relative rounded-full bg-background p-3 shadow-glow"
-      style={{ width: size + 24, height: size + 24 }}
-    >
-      <svg
-        width={size}
-        height={size}
-        style={{ transform: `rotate(${-progress * step}deg)` }}
+    <>
+      <div
+        aria-label="Draggable navigation wheel"
+        className={`relative cursor-grab touch-none select-none rounded-full bg-background p-3 shadow-glow active:cursor-grabbing ${drag.opening ? "pointer-events-none" : ""}`}
+        style={{
+          width: size + 24,
+          height: size + 24,
+          transform: `translate(${drag.offset.x}px, ${drag.offset.y}px)`,
+        }}
+        {...drag.handlers}
       >
-        {tabs.map((tab, i) => {
-          const mid = ((i * step - 90) * Math.PI) / 180;
-          const tr = (rOut + rIn) / 2;
-          const label = TAB_LABEL[tab];
-          const on = i === active;
-          return (
-            <g
-              key={tab}
-              role="button"
-              tabIndex={0}
-              aria-label={label}
-              className="cursor-pointer outline-none focus:outline-none"
-              style={{ outline: "none" }}
-              onClick={() => onSelect(i)}
-              onMouseDown={(event) => event.preventDefault()}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  onSelect(i);
-                }
-              }}
-            >
-              <path
-                d={arc(i)}
-                className={
-                  on ? "fill-primary stroke-primary" : "fill-card stroke-border"
-                }
-                strokeWidth={1.5}
-              />
-              <text
-                x={c + tr * Math.cos(mid)}
-                y={c + tr * Math.sin(mid)}
-                textAnchor="middle"
-                dominantBaseline="central"
-                transform={`rotate(${i * step} ${c + tr * Math.cos(mid)} ${c + tr * Math.sin(mid)})`}
-                className={`font-display text-[9px] font-bold uppercase ${on ? "fill-primary-foreground" : "fill-muted-foreground"}`}
+        <svg
+          className={drag.opening ? "wheel-implode" : ""}
+          width={size}
+          height={size}
+          style={{ transform: `rotate(${-progress * step}deg)` }}
+        >
+          {tabs.map((tab, i) => {
+            const mid = ((i * step - 90) * Math.PI) / 180;
+            const tr = (rOut + rIn) / 2;
+            const label = TAB_LABEL[tab];
+            const on = i === active;
+            return (
+              <g
+                key={tab}
+                role="button"
+                tabIndex={0}
+                aria-label={label}
+                className="cursor-pointer outline-none focus:outline-none"
+                style={{ outline: "none" }}
+                onClick={() => {
+                  if (!drag.suppressClick.current) onSelect(i);
+                }}
+                onMouseDown={(event) => event.preventDefault()}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onSelect(i);
+                  }
+                }}
               >
-                {label}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-      <div className="pointer-events-none absolute inset-0 m-auto flex h-[88px] w-[88px] items-center justify-center rounded-full border border-border bg-background px-2 text-center">
-        <span className="font-display text-[11px] font-bold uppercase leading-tight text-primary">
-          {TAB_LABEL[tabs[active] ?? tabs[0]!]}
-        </span>
+                <path
+                  d={arc(i)}
+                  className={
+                    on
+                      ? "fill-primary stroke-primary"
+                      : "fill-card stroke-border"
+                  }
+                  strokeWidth={1.5}
+                />
+                <text
+                  x={c + tr * Math.cos(mid)}
+                  y={c + tr * Math.sin(mid)}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  transform={`rotate(${i * step} ${c + tr * Math.cos(mid)} ${c + tr * Math.sin(mid)})`}
+                  className={`font-display text-[9px] font-bold uppercase ${on ? "fill-primary-foreground" : "fill-muted-foreground"}`}
+                >
+                  {label}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+        <div className="pointer-events-none absolute inset-0 m-auto flex h-[88px] w-[88px] items-center justify-center rounded-full border border-border bg-background px-2 text-center">
+          <span className="font-display text-[11px] font-bold uppercase leading-tight text-primary">
+            {TAB_LABEL[tabs[active] ?? tabs[0]!]}
+          </span>
+        </div>
       </div>
-    </div>
+      {drag.revealProps && (
+        <div
+          aria-hidden="true"
+          className="wheel-page-reveal"
+          {...drag.revealProps}
+        />
+      )}
+    </>
   );
 }
 
@@ -265,7 +290,7 @@ export function EmployeeApp() {
     : "Employee";
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-background p-4 md:p-6">
+    <div className="employee-ui flex h-dvh flex-col overflow-hidden bg-background p-4 md:p-6">
       <FinpilotHeader
         badge="Prototype data"
         role={role}
@@ -296,16 +321,20 @@ export function EmployeeApp() {
               tabs.map((tab, index) => (
                 <section
                   key={tab}
-                  className="flex h-full snap-start flex-col overflow-y-auto px-6 py-6 md:py-8 md:pl-72 md:pr-6"
+                  className="flex h-full snap-start flex-col overflow-y-auto px-6 pb-8 md:pl-72 md:pr-6"
                 >
-                  <p className="mb-3 font-display text-sm font-bold uppercase tracking-[0.3em] text-primary">
+                  <p className="sticky top-0 z-20 -mx-6 mb-4 border-b border-border/70 bg-background/95 px-6 py-3 font-sans text-sm font-semibold tracking-wide text-foreground backdrop-blur md:-ml-72 md:pl-72">
                     {String(index + 1).padStart(2, "0")} — {TAB_LABEL[tab]}
                   </p>
                   {tab === "home" && (
                     <HomePanel
                       banner={session.data.banner}
                       features={session.data.features}
-                      onOpen={(next) => goTo(tabs.indexOf(next))}
+                      tabs={tabs}
+                      onOpen={(next) => {
+                        const index = tabs.indexOf(next);
+                        if (index >= 0) goTo(index);
+                      }}
                     />
                   )}
                   {tab === "research" && (
@@ -330,19 +359,21 @@ export function EmployeeApp() {
                   {tab === "compliance" && (
                     <CompliancePanel
                       features={session.data.features}
-                      onOpen={(next) => goTo(tabs.indexOf(next))}
+                      onOpen={(next) => {
+                        const index = tabs.indexOf(next);
+                        if (index >= 0) goTo(index);
+                      }}
                     />
                   )}
                   {tab === "benefits" && (
                     <BenefitsPanel
                       admin={employee?.role === "benefits_admin"}
-                      focused={
-                        activeTab === "benefits" ||
-                        activeTab === "home" ||
-                        activeTab === "activity"
-                      }
+                      focused={activeTab === "benefits" || activeTab === "home"}
                       onContext={setBessie}
                     />
+                  )}
+                  {tab === "activity" && (
+                    <ActivityPanel features={session.data.features} />
                   )}
                   {tab === "learn" && (
                     <div className="max-w-2xl space-y-4">
@@ -370,7 +401,15 @@ export function EmployeeApp() {
           </div>
           {tabs.length > 0 && (
             <div className="absolute -bottom-2 -left-2 z-10">
-              <EmployeeWheel tabs={tabs} progress={progress} onSelect={goTo} />
+              <EmployeeWheel
+                tabs={tabs}
+                progress={progress}
+                onSelect={goTo}
+                onCenter={() => {
+                  rememberFifth("employee");
+                  void navigate({ to: "/page-five" });
+                }}
+              />
             </div>
           )}
         </div>
@@ -382,15 +421,17 @@ export function EmployeeApp() {
                 ? session.data?.features.includes("staff.fairness")
                   ? "staff.fairness"
                   : "staff.audit"
-                : activeTab === "learn"
-                  ? "staff.access"
-                  : activeTab === "research" ||
-                      activeTab === "cases" ||
-                      activeTab === "portfolio"
-                    ? bessie.featureId
-                    : activeTab === "benefits"
-                      ? "staff.benefits"
-                      : "staff.access"
+                : activeTab === "activity"
+                  ? "staff.decision"
+                  : activeTab === "learn"
+                    ? "staff.access"
+                    : activeTab === "research" ||
+                        activeTab === "cases" ||
+                        activeTab === "portfolio"
+                      ? bessie.featureId
+                      : activeTab === "benefits"
+                        ? "staff.benefits"
+                        : "staff.access"
             }
             resourceId={
               activeTab === "research" || activeTab === "cases"
@@ -412,18 +453,20 @@ export function EmployeeApp() {
           aria-modal="true"
           aria-label="Profile"
         >
-          <div className="rounded-2xl border border-border bg-background p-6 space-y-4">
-            <h2 className="font-display text-2xl font-bold">
+          <div className="w-full max-w-md space-y-4 rounded-2xl border border-border bg-background p-6">
+            <h2 className="font-sans text-2xl font-semibold">
               {employee?.display_name}
             </h2>
             <p>{role}</p>
             <p className="text-sm text-muted-foreground">
               Workspace access is assigned to your account.
             </p>
-            <Button variant="outline" onClick={() => setProfileOpen(false)}>
-              Close
-            </Button>
-            <Button onClick={() => void signOut()}>Sign out</Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setProfileOpen(false)}>
+                Close
+              </Button>
+              <Button onClick={() => void signOut()}>Sign out</Button>
+            </div>
           </div>
         </div>
       )}
@@ -434,10 +477,12 @@ export function EmployeeApp() {
 function HomePanel({
   banner,
   features,
+  tabs,
   onOpen,
 }: {
   banner: string;
   features: string[];
+  tabs: StaffTab[];
   onOpen: (tab: StaffTab) => void;
 }) {
   const home = useQuery({
@@ -485,12 +530,16 @@ function HomePanel({
                 "Tenure discount, remaining cap, and a simulated redemption",
               onClick: () => onOpen("benefits"),
             },
-            {
-              label: "Review activity",
-              detail:
-                "Your decisions, case notes, and redemptions on this desk",
-              onClick: () => onOpen("activity"),
-            },
+            ...(tabs.includes("activity")
+              ? [
+                  {
+                    label: "Review activity",
+                    detail:
+                      "Saved decisions and recorded outcomes on this desk",
+                    onClick: () => onOpen("activity"),
+                  },
+                ]
+              : []),
             {
               label: "Ask Bessie",
               detail:
@@ -503,6 +552,53 @@ function HomePanel({
       <p className="text-xs text-muted-foreground">{banner}</p>
     </div>
   );
+}
+
+function reviewFields(input: {
+  prospectId: string;
+  product: string;
+  reference: string;
+  purpose: string;
+  breakGlass: string;
+  outcome: string;
+  recommended: string;
+  decision: string;
+  rationale: string;
+  overrideReason: string;
+  policy: string;
+  rules: { rule: string; status: string }[];
+}) {
+  const purposeLabel =
+    input.purpose === "senior_review"
+      ? "Senior review"
+      : input.purpose === "quality_review"
+        ? "Quality review"
+        : input.purpose === "application_review"
+          ? "Application review"
+          : input.purpose;
+  return [
+    { label: "Prospect", value: input.prospectId },
+    { label: "Product", value: input.product },
+    { label: "Purpose", value: purposeLabel },
+    { label: "Application reference", value: input.reference },
+    ...(input.breakGlass.trim()
+      ? [{ label: "Break-glass reason", value: input.breakGlass.trim() }]
+      : []),
+    { label: "Engine outcome", value: input.outcome },
+    { label: "Suggested next step", value: input.recommended },
+    { label: "Your decision", value: input.decision },
+    { label: "Rationale", value: input.rationale.trim() },
+    ...(input.overrideReason.trim()
+      ? [{ label: "Override reason", value: input.overrideReason.trim() }]
+      : []),
+    { label: "Policy", value: input.policy },
+    {
+      label: "Rules",
+      value: input.rules
+        .map((rule) => `${rule.rule}: ${rule.status}`)
+        .join(", "),
+    },
+  ].filter((field) => field.value);
 }
 
 function ResearchPanel({
@@ -536,7 +632,23 @@ function ResearchPanel({
   const [rationale, setRationale] = useState("");
   const [overrideReason, setOverrideReason] = useState("");
   const [recorded, setRecorded] = useState<string | null>(null);
+  const [savedDraft, setSavedDraft] = useState<string | null>(null);
+  const appliedDraft = useRef<string | null>(null);
+  const queryClient = useQueryClient();
   const prospect = queue.data?.prospects.find((row) => row.id === prospectId);
+  const saved = useQuery({
+    queryKey: ["staff", "decisions"],
+    queryFn: () =>
+      staffFetch<{
+        in_progress?: {
+          id: string;
+          run_id: string;
+          decision: string;
+          rationale: string;
+          override_reason?: string | null;
+        }[];
+      }>("/decisions"),
+  });
   useEffect(() => {
     if (!focused) return;
     onContext({
@@ -552,35 +664,59 @@ function ResearchPanel({
     });
   }, [focused, onContext, run]);
 
-  const openGrant = async () => {
-    if (!prospect || !purpose) return;
+  const openGrant = async (next?: {
+    id: string;
+    application_ref: string;
+    purpose: string;
+  }) => {
+    const target =
+      next ??
+      (prospect && purpose
+        ? {
+            id: prospect.id,
+            application_ref: reference || prospect.application_ref,
+            purpose,
+          }
+        : null);
+    if (!target) return undefined;
     setBusy("grant");
     setError(null);
     setRun(null);
-    setDecision("");
     setRecorded(null);
+    setSavedDraft(null);
+    appliedDraft.current = null;
     try {
       const grant = await staffFetch<{ id: string }>("/access-grants", {
         body: {
-          prospect_id: prospect.id,
-          purpose,
-          reference_id: reference || prospect.application_ref,
+          prospect_id: target.id,
+          purpose: target.purpose,
+          reference_id: target.application_ref,
           ...(breakGlass.trim()
             ? { break_glass_reason: breakGlass.trim() }
             : {}),
         },
       });
       setGrantId(grant.id);
+      setPurpose(target.purpose);
       const profile = await staffFetch<{ prospect: Record<string, unknown> }>(
-        `/prospects/${prospect.id}?grant_id=${grant.id}`,
+        `/prospects/${target.id}?grant_id=${grant.id}`,
       );
       const result = await staffFetch<Record<string, unknown>>(
         "/research-runs",
         { body: { grant_id: grant.id } },
       );
-      setRun({ ...result, profile: profile.prospect });
+      const opened = { ...result, profile: profile.prospect };
+      setRun(opened);
+      if (target.purpose === "senior_review") {
+        const filed = queue.data?.prospects.find(
+          (item) => item.id === target.id,
+        );
+        if (filed) await fileSeniorReview(opened, filed);
+      }
+      return opened;
     } catch (err) {
       setError(err);
+      return undefined;
     } finally {
       setBusy(null);
     }
@@ -592,6 +728,40 @@ function ResearchPanel({
       | undefined) ?? [];
   const recommended = String(run?.["recommended_human_action"] ?? "");
   const needsOverride = Boolean(decision) && decision !== recommended;
+  const fileSeniorReview = async (
+    source: Record<string, unknown>,
+    row: { id: string; product: string; application_ref: string },
+  ) => {
+    const sourceRules =
+      (source["rules"] as { rule: string; status: string }[] | undefined) ?? [];
+    const filed = await staffFetch<{ id: string }>("/decisions/drafts", {
+      body: {
+        run_id: source["id"],
+        decision: "Refer to senior review",
+        rationale: rationale.trim(),
+        ...(overrideReason.trim()
+          ? { override_reason: overrideReason.trim() }
+          : {}),
+        fields: reviewFields({
+          prospectId: row.id,
+          product: row.product,
+          reference: row.application_ref,
+          purpose: "senior_review",
+          breakGlass,
+          outcome: String(source["outcome"] ?? ""),
+          recommended: String(source["recommended_human_action"] ?? ""),
+          decision: "Refer to senior review",
+          rationale,
+          overrideReason,
+          policy: String(source["policy_version"] ?? ""),
+          rules: sourceRules,
+        }),
+      },
+    });
+    setSavedDraft(filed.id);
+    appliedDraft.current = String(source["id"]);
+    void queryClient.invalidateQueries({ queryKey: ["staff", "decisions"] });
+  };
 
   const chooseProspect = (id: string) => {
     const row = queue.data?.prospects.find((item) => item.id === id);
@@ -603,7 +773,111 @@ function ResearchPanel({
     setRationale("");
     setOverrideReason("");
     setRecorded(null);
-    setPurpose("");
+    setSavedDraft(null);
+    appliedDraft.current = null;
+  };
+
+  const runId = typeof run?.["id"] === "string" ? run["id"] : null;
+  useEffect(() => {
+    if (!runId || !saved.isSuccess || appliedDraft.current === runId) return;
+    const draft = saved.data?.in_progress?.find((row) => row.run_id === runId);
+    appliedDraft.current = runId;
+    if (!draft) return;
+    setDecision(draft.decision);
+    setRationale(draft.rationale);
+    setOverrideReason(draft.override_reason ?? "");
+    setSavedDraft(draft.id);
+  }, [runId, saved.data, saved.isSuccess]);
+
+  const saveProgress = () => {
+    if (!runId) return;
+    setBusy("draft");
+    setError(null);
+    void staffFetch<{ id: string }>("/decisions/drafts", {
+      body: {
+        run_id: runId,
+        decision,
+        rationale: rationale.trim(),
+        ...(overrideReason.trim()
+          ? { override_reason: overrideReason.trim() }
+          : {}),
+        fields: reviewFields({
+          prospectId: prospect?.id ?? "",
+          product: prospect?.product ?? "",
+          reference,
+          purpose,
+          breakGlass,
+          outcome: String(run?.["outcome"] ?? ""),
+          recommended,
+          decision,
+          rationale,
+          overrideReason,
+          policy: String(run?.["policy_version"] ?? ""),
+          rules,
+        }),
+      },
+    })
+      .then((row) => {
+        setSavedDraft(row.id);
+        void queryClient.invalidateQueries({
+          queryKey: ["staff", "decisions"],
+        });
+      })
+      .catch((err) => setError(err))
+      .finally(() => setBusy(null));
+  };
+
+  const recordDecision = () => {
+    if (!runId) return;
+    if (!decision) {
+      setError(new Error("Select a decision before recording it."));
+      return;
+    }
+    if (rationale.trim().length < 10) {
+      setError(new Error("Add a rationale of at least 10 characters."));
+      return;
+    }
+    if (needsOverride && overrideReason.trim().length < 10) {
+      setError(
+        new Error(
+          "This differs from the suggested next step. Add an override reason of at least 10 characters.",
+        ),
+      );
+      return;
+    }
+    setBusy("decision");
+    setError(null);
+    void staffFetch<{ id: string }>("/decisions", {
+      body: {
+        run_id: runId,
+        decision,
+        rationale: rationale.trim(),
+        ...(needsOverride ? { override_reason: overrideReason.trim() } : {}),
+        fields: reviewFields({
+          prospectId: prospect?.id ?? "",
+          product: prospect?.product ?? "",
+          reference,
+          purpose,
+          breakGlass,
+          outcome: String(run?.["outcome"] ?? ""),
+          recommended,
+          decision,
+          rationale,
+          overrideReason,
+          policy: String(run?.["policy_version"] ?? ""),
+          rules,
+        }),
+      },
+    })
+      .then((row) => {
+        setRecorded(row.id);
+        setSavedDraft(null);
+        void queryClient.invalidateQueries({
+          queryKey: ["staff", "decisions"],
+        });
+      })
+      .catch((err) => setError(err))
+      .finally(() => setBusy(null));
   };
 
   return (
@@ -666,9 +940,27 @@ function ResearchPanel({
           },
           {
             label: "Senior review",
-            detail:
-              "Sets the purpose. You still confirm the reference and the decision.",
-            onClick: () => setPurpose("senior_review"),
+            detail: prospect
+              ? "Opens the file and selects Refer to senior review"
+              : "Selects the first assigned file and Refer to senior review",
+            onClick: () => {
+              const row = prospect ?? queue.data?.prospects[0];
+              if (!row) return;
+              setProspectId(row.id);
+              setReference(row.application_ref);
+              setPurpose("senior_review");
+              setDecision("Refer to senior review");
+              setError(null);
+              if (run && prospectId === row.id) {
+                void fileSeniorReview(run, row).catch((err) => setError(err));
+                return;
+              }
+              void openGrant({
+                id: row.id,
+                application_ref: row.application_ref,
+                purpose: "senior_review",
+              });
+            },
           },
           {
             label: "Refresh queue",
@@ -817,8 +1109,10 @@ function ResearchPanel({
           <div className="space-y-2 rounded-2xl border border-border p-4">
             <h3 className="font-display font-bold">Your decision</h3>
             <p className="text-sm text-muted-foreground">
-              Nothing is sent externally. A different choice than the suggestion
-              needs an override reason.
+              Nothing is sent externally. Refer to senior review records that
+              choice. A different choice than the suggestion needs an override
+              reason. Save progress keeps the decision on Activity before you
+              record it.
             </p>
             <select
               className="w-full rounded-md border border-border bg-background px-3 py-2"
@@ -845,33 +1139,28 @@ function ResearchPanel({
                 placeholder="Override reason (at least 10 characters)"
               />
             )}
-            <Button
-              disabled={
-                !decision ||
-                rationale.trim().length < 10 ||
-                (needsOverride && overrideReason.trim().length < 10) ||
-                busy !== null
-              }
-              onClick={() => {
-                setBusy("decision");
-                setError(null);
-                void staffFetch<{ id: string }>("/decisions", {
-                  body: {
-                    run_id: run["id"],
-                    decision,
-                    rationale: rationale.trim(),
-                    ...(needsOverride
-                      ? { override_reason: overrideReason.trim() }
-                      : {}),
-                  },
-                })
-                  .then((row) => setRecorded(row.id))
-                  .catch((err) => setError(err))
-                  .finally(() => setBusy(null));
-              }}
-            >
-              Record simulated decision
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                disabled={busy !== null || !runId}
+                onClick={saveProgress}
+              >
+                {busy === "draft" ? "Saving…" : "Save progress"}
+              </Button>
+              <Button
+                disabled={busy !== null || !runId}
+                onClick={recordDecision}
+              >
+                {busy === "decision"
+                  ? "Recording…"
+                  : "Record simulated decision"}
+              </Button>
+            </div>
+            {savedDraft && !recorded && (
+              <p className="text-sm text-primary">
+                In progress {savedDraft}. It is on Activity.
+              </p>
+            )}
             {recorded && (
               <p className="text-sm text-primary">Recorded {recorded}.</p>
             )}
@@ -1188,11 +1477,15 @@ function CompliancePanel({
                 },
               ]
             : []),
-          {
-            label: "Your activity",
-            detail: "Decisions and redemptions recorded for you",
-            onClick: () => onOpen("activity"),
-          },
+          ...(features.includes("staff.creditresearch")
+            ? [
+                {
+                  label: "Your activity",
+                  detail: "Decisions and redemptions recorded for you",
+                  onClick: () => onOpen("activity"),
+                },
+              ]
+            : []),
         ]}
       />
       {features.includes("staff.anomaly") && (
@@ -1428,6 +1721,7 @@ function BenefitsPanel({
 }
 
 function ActivityPanel({ features }: { features: string[] }) {
+  const [openId, setOpenId] = useState<string | null>(null);
   const decisions = useQuery({
     queryKey: ["staff", "decisions"],
     enabled: features.includes("staff.decision"),
@@ -1439,6 +1733,17 @@ function ActivityPanel({ features }: { features: string[] }) {
           rationale: string;
           recorded_at?: string;
           override?: boolean;
+          sent_externally?: boolean;
+          fields?: { label: string; value: string }[];
+        }[];
+        in_progress?: {
+          id: string;
+          decision: string;
+          rationale: string;
+          saved_at?: string;
+          prospect_id?: string;
+          status?: string;
+          fields?: { label: string; value: string }[];
         }[];
       }>("/decisions"),
   });
@@ -1464,11 +1769,23 @@ function ActivityPanel({ features }: { features: string[] }) {
       }>("/cases"),
   });
   const rows = [
+    ...(decisions.data?.in_progress ?? []).map((row) => ({
+      id: row.id,
+      title:
+        row.decision ||
+        `In progress${row.prospect_id ? ` · ${row.prospect_id}` : ""}`,
+      detail:
+        row.rationale ||
+        "Saved from research. Open the time to see the fields.",
+      when: row.saved_at ?? "",
+      fields: row.fields ?? [],
+    })),
     ...(decisions.data?.decisions ?? []).map((row) => ({
       id: row.id,
       title: row.decision,
       detail: row.rationale,
       when: row.recorded_at ?? "",
+      fields: row.fields ?? [],
     })),
     ...(benefits.data?.ledger ?? []).map((row) => ({
       id: row.id,
@@ -1477,12 +1794,14 @@ function ActivityPanel({ features }: { features: string[] }) {
         row.label ??
         `Saved $${(row.discount_cents / 100).toFixed(2)}. Simulated redemption.`,
       when: row.redeemed_at ?? "",
+      fields: [] as { label: string; value: string }[],
     })),
     ...(cases.data?.cases ?? []).map((row) => ({
       id: row.id,
       title: `Case ${row.id} · ${row.status}`,
       detail: row.consented_context,
       when: "",
+      fields: [] as { label: string; value: string }[],
     })),
   ].sort((a, b) => b.when.localeCompare(a.when));
   const canDecisions = features.includes("staff.decision");
@@ -1515,6 +1834,7 @@ function ActivityPanel({ features }: { features: string[] }) {
         loading={loading}
         error={error}
         empty={!loading && rows.length === 0}
+        emptyText="No saved decisions yet. Save progress or record a decision in Research."
       >
         <ul className="space-y-2">
           {rows.map((row) => (
@@ -1525,7 +1845,34 @@ function ActivityPanel({ features }: { features: string[] }) {
               <p className="font-display font-bold">{row.title}</p>
               <p className="text-sm text-muted-foreground">{row.detail}</p>
               {row.when && (
-                <p className="mt-1 text-xs text-muted-foreground">{row.when}</p>
+                <button
+                  type="button"
+                  className="mt-2 font-mono text-xs text-primary underline-offset-2 hover:underline"
+                  aria-expanded={openId === row.id}
+                  onClick={() =>
+                    setOpenId((current) => (current === row.id ? null : row.id))
+                  }
+                >
+                  {row.when}
+                </button>
+              )}
+              {openId === row.id && (
+                <dl className="mt-3 space-y-2 border-t border-border pt-3 text-sm">
+                  {(row.fields.length
+                    ? row.fields
+                    : [
+                        { label: "Record", value: row.title },
+                        { label: "Notes", value: row.detail },
+                      ]
+                  ).map((field) => (
+                    <div key={field.label}>
+                      <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                        {field.label}
+                      </dt>
+                      <dd>{field.value}</dd>
+                    </div>
+                  ))}
+                </dl>
               )}
             </li>
           ))}

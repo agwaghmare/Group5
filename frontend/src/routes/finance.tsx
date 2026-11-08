@@ -7,7 +7,7 @@ type FinanceSearch = {
   view?: FinanceView | undefined;
 };
 
-const VIEWS: FinanceView[] = ["money", "bills", "goals", "health"];
+const VIEWS: FinanceView[] = ["money", "bills", "goals", "health", "whatif"];
 
 export const Route = createFileRoute("/finance")({
   validateSearch: (search: Record<string, unknown>): FinanceSearch => {
@@ -17,7 +17,7 @@ export const Route = createFileRoute("/finance")({
       overview: "money",
       cash: "money",
       debt: "health",
-      whatif: "health",
+      whatif: "whatif",
     };
     if (typeof view === "string" && view in legacy) return { view: legacy[view] };
     return {

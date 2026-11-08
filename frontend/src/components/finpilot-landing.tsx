@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FinpilotHeader } from "@/components/finpilot-header";
 import { Button } from "@/components/ui/button";
+import { rememberFifth } from "@/lib/fifth-page";
 import { shouldOpenFifthPage } from "@/lib/wheel-navigation";
 
 const SECTIONS: {
@@ -261,11 +262,6 @@ export function LandingPage() {
                   <Link to={s.to}>{s.cta ?? "Open"}</Link>
                 </Button>
               )}
-              {i === 0 && (
-                <Button asChild variant="outline" className="mt-4 w-fit" size="lg">
-                  <Link to="/employee">Employee sign in</Link>
-                </Button>
-              )}
             </section>
           ))}
         </div>
@@ -275,6 +271,7 @@ export function LandingPage() {
             progress={progress}
             onSelect={goTo}
             onCenter={() => {
+              rememberFifth("customer");
               void navigate({ to: "/page-five" });
             }}
           />

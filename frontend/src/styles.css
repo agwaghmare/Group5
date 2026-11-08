@@ -122,24 +122,66 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+.employee-ui,
+.employee-ui .font-display {
+  font-family: "Figtree", "Manrope", sans-serif;
+}
+
+.employee-ui h1 {
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
 .login-wheel {
   animation: login-wheel-spin 48s linear infinite;
 }
 
-.login-wheel-dock.is-docking {
-  transition: transform 1400ms cubic-bezier(0.16, 1, 0.3, 1);
-  transform: translate(var(--dock-x), var(--dock-y)) scale(var(--dock-scale));
-  z-index: 30;
+.login-slice {
+  transform-box: fill-box;
 }
 
-.login-wheel-dock.is-docking .login-wheel {
-  animation-play-state: paused;
+.login-burst .login-slice {
+  animation: login-slice-burst 720ms cubic-bezier(0.45, 0, 1, 0.55) forwards;
+}
+
+.login-form-wheel {
+  position: fixed;
+  z-index: 40;
+  transform: translate(-50%, -50%);
+}
+
+.login-form-wheel .login-slice {
+  transform: translate(var(--dx), var(--dy));
+  opacity: 0;
+}
+
+.login-form-wheel.is-in .login-slice {
+  animation: login-slice-gather 920ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .login-card.is-docking {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 420ms ease;
+  transition: opacity 280ms ease;
+}
+
+@keyframes login-slice-burst {
+  to {
+    transform: translate(var(--dx), var(--dy)) rotate(28deg) scale(1.08);
+    opacity: 0;
+  }
+}
+
+@keyframes login-slice-gather {
+  from {
+    transform: translate(var(--dx), var(--dy)) rotate(-24deg);
+    opacity: 0;
+  }
+  to {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
 }
 
 @keyframes login-wheel-spin {
@@ -147,6 +189,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wheel-implode, .wheel-page-reveal, .wheel-page-return-ring, .fifth-page-enter, .login-wheel { animation-duration: 1ms; }
-  .login-wheel-dock.is-docking, .login-card.is-docking { transition-duration: 1ms; }
+  .wheel-implode, .wheel-page-reveal, .wheel-page-return-ring, .fifth-page-enter, .login-wheel, .login-burst .login-slice, .login-form-wheel.is-in .login-slice { animation-duration: 1ms; }
+  .login-card.is-docking { transition-duration: 1ms; }
 }

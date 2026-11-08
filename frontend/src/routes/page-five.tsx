@@ -1,18 +1,20 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { FinpilotHeader } from "@/components/finpilot-header";
-import { RequireCustomer } from "@/components/require-customer";
+import { CenterBrief } from "@/components/center-brief";
 import { LandingPage } from "@/components/finpilot-landing";
+import { RequireCustomer } from "@/components/require-customer";
+import { readFifth } from "@/lib/fifth-page";
 
 export const Route = createFileRoute("/page-five")({
-  head: () => ({ meta: [
-    { title: "Page Five — FINPILOT" },
-    { name: "description", content: "FINPILOT's fifth page." },
-    { property: "og:title", content: "Page Five — FINPILOT" },
-    { property: "og:description", content: "FINPILOT's fifth page." },
-    { property: "og:type", content: "website" },
-    { name: "twitter:card", content: "summary_large_image" },
-  ] }),
+  head: () => ({
+    meta: [
+      { title: "The center — FINPILOT" },
+      {
+        name: "description",
+        content: "The model explains. A person records the decision.",
+      },
+    ],
+  }),
   component: PageFive,
 });
 
@@ -24,35 +26,61 @@ function wheelHome() {
 }
 
 function PageFive() {
+  const from = readFifth();
   const [origin, setOrigin] = useState<{ x: number; y: number } | null>(null);
   const navigate = useNavigate();
+  const leave = () => {
+    if (from === "employee") void navigate({ to: "/employee" });
+    else if (from === "login") void navigate({ to: "/login" });
+    else void navigate({ to: "/" });
+  };
+  if (from === "employee" || from === "login") {
+    return (
+      <>
+        {!origin && (
+          <CenterBrief from={from} onReturn={() => setOrigin(wheelHome())} />
+        )}
+        {origin && (
+          <div
+            className="wheel-page-return-ring"
+            style={{ left: origin.x, top: origin.y }}
+            onAnimationEnd={(event) => {
+              if (event.target === event.currentTarget) leave();
+            }}
+          />
+        )}
+      </>
+    );
+  }
   return (
     <RequireCustomer>
-    <>
-    {origin && (
-      <div className="pointer-events-none fixed inset-0 z-40" aria-hidden="true" inert>
-        <LandingPage />
-      </div>
-    )}
-    {!origin && (
-      <div className="relative flex h-dvh flex-col overflow-hidden bg-background p-4 md:p-6">
-        <FinpilotHeader miniWheel onWheelReturn={() => setOrigin(wheelHome())} />
-        <main className="fifth-page-enter flex min-h-0 flex-1 flex-col justify-center rounded-[2rem] border border-border px-8 md:px-20">
-          <p className="mb-4 font-display text-sm font-bold uppercase text-primary">05 — FINPILOT</p>
-          <h1 className="font-display text-5xl font-extrabold md:text-7xl">Page Five</h1>
-        </main>
-      </div>
-    )}
-    {origin && (
-      <div
-        className="wheel-page-return-ring"
-        style={{ left: origin.x, top: origin.y }}
-        onAnimationEnd={(event) => {
-          if (event.target === event.currentTarget) void navigate({ to: "/" });
-        }}
-      />
-    )}
-    </>
+      <>
+        {origin && (
+          <div
+            className="pointer-events-none fixed inset-0 z-40"
+            aria-hidden="true"
+            inert
+          >
+            <LandingPage />
+          </div>
+        )}
+        {!origin && (
+          <CenterBrief
+            from="customer"
+            onReturn={() => setOrigin(wheelHome())}
+          />
+        )}
+        {origin && (
+          <div
+            className="wheel-page-return-ring"
+            style={{ left: origin.x, top: origin.y }}
+            onAnimationEnd={(event) => {
+              if (event.target === event.currentTarget)
+                void navigate({ to: "/" });
+            }}
+          />
+        )}
+      </>
     </RequireCustomer>
   );
 }
