@@ -296,7 +296,7 @@ export function EmployeeApp() {
   const role = employee ? ROLE_LABEL[employee.role] ?? employee.role : "Employee";
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-background p-4 md:p-6">
+    <div className="employee-ui flex h-dvh flex-col overflow-hidden bg-background p-4 md:p-6">
       <FinpilotHeader
         badge="SYNTHETIC DEMO"
         role={role}
@@ -309,8 +309,8 @@ export function EmployeeApp() {
             {session.error && !expired && <p className="p-10 text-sm text-destructive">{messageOf(session.error)}</p>}
             {session.data &&
               tabs.map((tab, index) => (
-                <section key={tab} className="flex h-full snap-start flex-col overflow-y-auto px-6 py-6 md:py-8 md:pl-72 md:pr-6">
-                  <p className="mb-3 font-display text-sm font-bold uppercase tracking-[0.3em] text-primary">
+                <section key={tab} className="flex h-full snap-start flex-col overflow-y-auto px-6 pb-8 md:pl-72 md:pr-6">
+                  <p className="sticky top-0 z-20 -mx-6 mb-4 border-b border-border/70 bg-background/95 px-6 py-3 font-sans text-sm font-semibold tracking-wide text-foreground backdrop-blur md:-ml-72 md:pl-72">
                     {String(index + 1).padStart(2, "0")} — {TAB_LABEL[tab]}
                   </p>
                   {tab === "home" && (
@@ -366,7 +366,7 @@ function PersonaGate({ onEnter, expired }: { onEnter: (id: string) => Promise<vo
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   return (
-    <div className="flex h-dvh flex-col bg-background p-4 md:p-6">
+    <div className="employee-ui flex h-dvh flex-col bg-background p-4 md:p-6">
       <FinpilotHeader />
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center gap-6">
         <p className="font-display text-sm font-bold uppercase tracking-[0.3em] text-primary">Employee sign in</p>
