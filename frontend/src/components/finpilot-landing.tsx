@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FinpilotHeader } from "@/components/finpilot-header";
 import { Button } from "@/components/ui/button";
+import { rememberFifth } from "@/lib/fifth-page";
 import { shouldOpenFifthPage } from "@/lib/wheel-navigation";
 
 const SECTIONS: {
@@ -270,6 +271,7 @@ export function LandingPage() {
             progress={progress}
             onSelect={goTo}
             onCenter={() => {
+              rememberFifth("customer");
               void navigate({ to: "/page-five" });
             }}
           />
