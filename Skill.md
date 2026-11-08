@@ -5,7 +5,7 @@ description: Build, extend, debug, test, and demo FinPilot, an exclusively PNC-f
 
 # FinPilot: Engineering and Product Skill
 
-**Employee identity / AI update (user decision):** normal login uses provisioned email/password accounts and the database-assigned role. Do not offer a demo persona switcher or auto-create demo employees in the normal app. Preserve old synthetic records for audit/history; adopt an existing identity or provision a new employee through local administrative commands. Bessie uses the backend's `MISTRAL_API_KEY`, a versioned purpose prompt, authorized evidence and validated output. A provider selector or per-agent API keys are not required. Test fixtures may explicitly seed synthetic employees in isolated databases. See `backend/BESSIE_SETUP.md`.
+**Employee identity / AI update (user decision):** normal login uses provisioned email/password accounts and the database-assigned role. Do not offer a demo persona switcher or auto-create demo employees in the normal app. Preserve old synthetic records for audit/history; adopt an existing identity or provision a new employee through local administrative commands. Bessie uses the backend's `NVIDIA_API_KEY`, a versioned purpose prompt, authorized evidence and validated output. A provider selector or per-agent API keys are not required. Test fixtures may explicitly seed synthetic employees in isolated databases. See `backend/BESSIE_SETUP.md`.
 
 **Current implementation override (user decision):** use SQLAlchemy models with a local SQLite database instead of TigerData. Users have unique normalized email addresses and database-assigned roles. Customer finance comes exclusively from `data/personal_finance_tracker_dataset.csv`, preserving all columns and snapshot history. Do not load `Lab_Package` or `data/lab_package_demo`. The role/view matrix below still applies; SQLite access is enforced by the backend's scoped queries, not PostgreSQL roles or RLS. Older Tiger/Lab schema and pipeline descriptions below are reference material, superseded for the active app by this decision. See `backend/SQLALCHEMY_SETUP.md`.
 
@@ -68,11 +68,12 @@ The built landing page has a bottom-left wheel with tabs. The selected tab shows
 | 5 | `portfolio` | Portfolio | `staff_copilot` (Bessie) | `portfolio_manager`, `marketing_analyst` | Aggregates, business impact, campaigns |
 | 6 | `compliance` | Compliance | `staff_copilot` (Bessie) | `compliance_analyst`, `auditor` | Fairness monitor, anomaly queue, audit log |
 | 7 | `benefits` | Benefits | `staff_copilot` (Bessie) | every staff role (`benefits_admin` gets the admin view) | Employee discounts |
-| 8 | `learn` | Learn | `learn` (Wilbur) | every role | Staff see it too; Wilbur runs with the invoking role's permissions |
+| 8 | `learn` | Learn | `learn` (Wilbur) | every role except `credit_analyst` | Other staff see it; Wilbur runs with the invoking role's permissions. Credit analysts do not get Learn or Wilbur. |
+| 9 | `activity` | Activity | none | `credit_analyst` | Saved in-progress decisions and the human decision log |
 
-**The wheel is role-filtered.** The registry lists every tab, but a signed-in role sees only the tabs its role may use (Section 3.5), and the wheel is drawn from that filtered list. **Display numbers and eyebrows are positional:** the `Order` column only sorts tabs. The number on an unselected segment, and the eyebrow (`0N — LABEL`), use the tab's position in the **visible** list (a Credit Analyst sees `01 — HOME`, `02 — RESEARCH`, `03 — BENEFITS`, `04 — LEARN`). Segment angle is 360 / N for N visible tabs. Never hard-code segment counts.
+**The wheel is role-filtered.** The registry lists every tab, but a signed-in role sees only the tabs its role may use (Section 3.5), and the wheel is drawn from that filtered list. **Display numbers and eyebrows are positional:** the `Order` column only sorts tabs. The number on an unselected segment, and the eyebrow (`0N — LABEL`), use the tab's position in the **visible** list (a Credit Analyst sees `01 — HOME`, `02 — RESEARCH`, `03 — BENEFITS`, `04 — ACTIVITY`). Segment angle is 360 / N for N visible tabs. Never hard-code segment counts.
 
-**Default customer wheel order: Home, Finance, Learn.** Staff wheel order: Home, the role's workspace tab, Benefits, Learn. Derive segment order, numbers, snap order, and the default landing target from this table and the role matrix (3.5), not from literals.
+**Default customer wheel order: Home, Finance, Learn.** Staff wheel order: Home, the role's workspace tab, Benefits, then Learn. A credit analyst ends with Activity instead of Learn. Derive segment order, numbers, snap order, and the default landing target from this table and the role matrix (3.5), not from literals.
 
 **Hiding is not security.** Navigating to a tab the role may not use (URL, stored state, or a stale `activeSection`) redirects to Home and logs the attempt, and the server independently refuses the data (Section 9.5).
 
@@ -126,7 +127,7 @@ Every staff feature carries a `Roles` list. A feature appears in a role's picker
 | `staff.access` | Role Access Framework | Access | all roles | P0 | Demo persona switcher, role taken from the session, role-filtered wheel tabs and pickers, permission-denied states, database roles and row-level security, break-glass, audit hooks (Sections 3.5, 9.5) |
 | `staff.prospect` | Prospect Profiles + Generator | Research | `credit_analyst` | P0 | Seeded synthetic prospect set and work queue; blind review by default; excluded attributes never shown (Section 5.4) |
 | `staff.creditresearch` | Credit Research Workbench | Research | `credit_analyst` | P0 | Evaluates versioned, synthetic policy rules for a prospect and requested product; returns a recommended review outcome, rule-by-rule evidence, strengths and concerns, missing inputs, an indicative pricing tier, and "what would change the outcome" (Section 7.5). PNC: personal loan, credit card |
-| `staff.decision` | Human Decision Log | Research | `credit_analyst` (write); `compliance_analyst` (review, read-only) | P0 | Records the human decision, rationale, and any override of the engine; nothing is sent externally |
+| `staff.decision` | Human Decision Log | Research | `credit_analyst` (write); `compliance_analyst` (review, read-only) | P0 | Records the human decision, rationale, and any override of the engine; an in-progress decision can be saved and reopened; nothing is sent externally |
 | `staff.cases` | Handoff Queue | Cases | `service_specialist` | P0 | Cases created by customer-agent handoffs with consented context only; Bessie prepares a grounded case brief; no upsell on protected customers (Section 7.7) |
 | `staff.portfolio` | Portfolio View | Portfolio | `portfolio_manager`; `marketing_analyst` (campaign results only) | P0 | Aggregate views with a minimum group size; research funnel and override rate; PNC aggregates from the 30-customer dataset |
 | `staff.benefits` | Employee Benefits | Benefits | every staff role; `benefits_admin` (admin) | P0 | Discounts on merchandise, service, accessories, and parts; tenure tiers, annual cap, simulated redemption, ledger (Section 7.6) |
@@ -143,7 +144,7 @@ Every staff feature carries a `Roles` list. A feature appears in a role's picker
 - Default to **no data sharing across agents**. Sharing needs an explicit, revocable user opt-in.
 - **Role gate:** before any tool call the router checks the session's role against the feature's `Roles` list and the tool's data scope. A denied call returns an honest "not available for your role" message and is written to the audit log. Role and employee ID come from the authenticated session, never from user text.
 - **Customer-to-staff handoff:** when a customer agent (the Finance coach) hands a case to a human, it creates a `cases` record holding only the context the customer consented to share. Bessie and the Service Specialist see that record and nothing more; staff never read a customer's live agent conversation.
-- **Wilbur on staff screens** runs with the invoking role's permissions and receives only the rule, metric, and numbers that user can already see.
+- **Wilbur on staff screens** runs with the invoking role's permissions and receives only the rule, metric, and numbers that user can already see. Credit analysts do not have Wilbur; Bessie is their only assistant.
 - Staff agents never write into the customer agents' data or recommendations, and the customer agents never call staff tools.
 
 ### 3.5 Roles and access (REGISTRY, part 2)
@@ -153,7 +154,7 @@ One customer role and seven employee roles. A role decides the visible wheel tab
 | Role key | Label | Visible tabs | Features it may use |
 | --- | --- | --- | --- |
 | `customer` | Customer (synthetic persona) | home, finance, learn | `fin.*`, `learn.*` on own data only |
-| `credit_analyst` | Credit Analyst | home, research, benefits, learn | `staff.access`, `staff.prospect`, `staff.creditresearch`, `staff.decision`, `staff.benefits` (own), `learn.explain` |
+| `credit_analyst` | Credit Analyst | home, research, benefits, activity | `staff.access`, `staff.prospect`, `staff.creditresearch`, `staff.decision`, `staff.benefits` (own) |
 | `service_specialist` | Customer Service Specialist | home, cases, benefits, learn | `staff.access`, `staff.cases`, `staff.benefits` (own), `learn.explain` |
 | `marketing_analyst` | Retention / Marketing Analyst | home, portfolio, benefits, learn | `staff.access`, `staff.campaigns`, `staff.portfolio` (campaign results), `staff.benefits` (own), `learn.explain` |
 | `portfolio_manager` | Portfolio / Risk Manager | home, portfolio, benefits, learn | `staff.access`, `staff.portfolio`, `staff.benefits` (own), `learn.explain` |
@@ -356,8 +357,8 @@ Parse user-supplied documents with Docling; retrieve sections with embeddings/re
 2. **Purpose gate:** choose a purpose (e.g., "application review") and enter the application reference; this creates a time-limited `access_grants` row, runs the conflict-of-interest check, and unlocks the credit file for this role.
 3. **Run research:** the deterministic rule engine evaluates the versioned policy on allowed inputs only.
 4. **Review the result:** recommended outcome; rule-by-rule evidence (value, threshold, pass/watch/fail); strengths and concerns; missing inputs; an indicative pricing tier labeled "indicative, synthetic, not an offer"; and **what would change the outcome** (computed counterfactuals, e.g., "paying revolving balances down by $Y brings utilization under the limit").
-5. **Ask Bessie** in plain English; the validator (9.2) grounds every number; Wilbur explains terms such as DTI and utilization on demand.
-6. **Record the decision** (`staff.decision`): `Proceed to next step (simulated)`, `Request more information`, `Refer to senior review`, or `Decline as entered (with reason codes)`. A rationale is required. Overriding the engine's recommendation needs a typed reason and is flagged for compliance review. Nothing is sent to the prospect; any notice text is a draft marked "for human review."
+5. **Ask Bessie** in plain English; the validator (9.2) grounds every number, including terms such as DTI and utilization. Credit analysts do not have a separate Learn assistant.
+6. **Save or record the decision** (`staff.decision`): `Proceed to next step (simulated)`, `Request more information`, `Refer to senior review`, or `Decline as entered (with reason codes)`. Saving keeps an in-progress decision on the Activity tab. Recording requires a rationale. Overriding the engine's recommendation needs a typed reason and is flagged for compliance review. Choosing senior review is the human decision `Refer to senior review`; it still records, and it is an override when that is not the engine's suggested next step. Nothing is sent to the prospect.
 7. Everything lands in `credit_research_runs`, `credit_decisions`, and `audit_log`.
 
 **Review outcomes** (engine output, in this precedence): `DOES_NOT_MEET` ("Does not meet policy as entered": any hard-rule fail on a known input); else `INSUFFICIENT_DATA` ("Required inputs missing; cannot evaluate": never a guess); else `REFER` ("Needs senior review or more information": any watch); else `MEETS_POLICY` ("Meets policy: suitable to proceed to review").

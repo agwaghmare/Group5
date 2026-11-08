@@ -114,7 +114,7 @@ workspace and scoped data. It supplies backend data, not rendered frontend HTML.
 | Role | Primary data | Tabs |
 | --- | --- | --- |
 | customer | Own tracker snapshots, all columns | home, finance, learn |
-| credit_analyst | Assigned prospect queue; credit fields require purpose grant | home, research, benefits, learn |
+| credit_analyst | Assigned prospect queue; credit fields require purpose grant | home, research, benefits, activity |
 | service_specialist | Assigned cases and consented context | home, cases, benefits, learn |
 | marketing_analyst | Campaign results; audience empty without verified consent data | home, portfolio, benefits, learn |
 | portfolio_manager | Tracker/research aggregates; groups below five suppressed | home, portfolio, benefits, learn |

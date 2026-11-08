@@ -84,6 +84,8 @@ class StaffAPI(unittest.TestCase):
         self.assertEqual(permissions,FEATURES)
         for role in ROLES:
             self.assertEqual(len(visible(role)),3 if role=='benefits_admin' else 4)
+        self.assertEqual(visible('credit_analyst'), ['home','research','benefits','activity'])
+        self.assertNotIn('credit_analyst', FEATURES['learn.explain'])
         self.assertTrue(all(set(roles).issubset(ROLES) for roles in FEATURES.values()))
 
     def test_purpose_gate_conflict_break_glass_and_expiry(self):
@@ -129,6 +131,35 @@ class StaffAPI(unittest.TestCase):
         self.assertTrue(any(r['outcome']=='denied' for r in events))
         h2=self.login('E002')
         self.assertEqual(self.client.get('/staff/research-runs/'+run['id'],headers=h2).status_code,403)
+
+    def test_senior_review_saves_progress_then_records(self):
+        h=self.login()
+        grant=self.client.post('/staff/access-grants',headers=h,json={
+            'prospect_id':'P001','purpose':'senior_review','reference_id':'APP-001'})
+        self.assertEqual(grant.status_code,201,grant.text)
+        run=self.client.post('/staff/research-runs',headers=h,json={'grant_id':grant.json()['id']})
+        self.assertEqual(run.status_code,201,run.text)
+        draft=self.client.post('/staff/decisions/drafts',headers=h,json={
+            'run_id':run.json()['id'],'decision':'Refer to senior review','rationale':'Holding for senior review',
+            'fields':[{'label':'Purpose','value':'Senior review'},{'label':'Application reference','value':'APP-001'}]})
+        self.assertEqual(draft.status_code,201,draft.text)
+        listed=self.client.get('/staff/decisions',headers=h).json()
+        self.assertEqual(listed['in_progress'][0]['status'],'in_progress')
+        self.assertEqual(listed['in_progress'][0]['fields'][0]['value'],'Senior review')
+        self.assertEqual(listed['in_progress'][0]['decision'],'Refer to senior review')
+        with Store() as store:
+            row=store.get('grants',grant.json()['id'])
+            row['expires_at']='2020-01-01T00:00:00+00:00'
+            store.execute('UPDATE grants SET payload=%s WHERE id=%s',(json.dumps(row),row['id']))
+        body={'run_id':run.json()['id'],'decision':'Refer to senior review','rationale':'Refer this file for senior review.'}
+        if run.json()['recommended_human_action']!='Refer to senior review':
+            self.assertEqual(self.client.post('/staff/decisions',headers=h,json=body).status_code,422)
+            body['override_reason']='Senior review is the chosen human outcome.'
+        saved=self.client.post('/staff/decisions',headers=h,json=body)
+        self.assertEqual(saved.status_code,201,saved.text)
+        listed=self.client.get('/staff/decisions',headers=h).json()
+        self.assertEqual(listed['in_progress'],[])
+        self.assertTrue(any(row['decision']=='Refer to senior review' for row in listed['decisions']))
 
     def test_benefit_caps_limits_idempotency_and_privacy(self):
         h=self.login()

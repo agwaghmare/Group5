@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.orm.accounts import archive_sample_accounts, demo_seed_enabled
 from app.orm.authorization import authorize_write, redact, scoped_query
-from app.orm.bootstrap import seed_identities
+from app.orm.bootstrap import seed_identities, sync_roles
 from app.orm.database import database_url, get_engine
 from app.orm.models import RECORD_MODELS, DataImport, Role
 from app.staff.policy import ALLOWED, POLICY
@@ -79,6 +79,7 @@ class Store:
                 seed(self)
                 if not self.db.get(Role, "customer") or not self.db.get(DataImport, "personal_finance_tracker_dataset.csv"):
                     seed_identities(self.db)
+                sync_roles(self.db)
                 archive_sample_accounts(self)
                 self.db.commit()
             except Exception:
@@ -130,7 +131,7 @@ class Store:
         return data
 
     def update(self, table, data):
-        if table not in ("cases", "anomalies", "grants", "sessions"):
+        if table not in ("cases", "anomalies", "grants", "sessions", "decision_drafts"):
             raise ValueError("This resource is append-only")
         row = self.db.get(RECORD_MODELS[table], data["id"])
         if row is None:

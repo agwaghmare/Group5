@@ -318,7 +318,7 @@ def test_greetings_are_bessie_without_financial_context_or_network(local, monkey
     h = login(local)
     calls = []
     install_nvidia(monkeypatch, lambda req: calls.append(req) or completion(req))
-    response = local.post("/staff/assistant", headers=h, json={"feature_id": "learn.explain", "question": question})
+    response = local.post("/staff/assistant", headers=h, json={"feature_id": "staff.access", "question": question})
     assert response.status_code == 200
     body = response.json()
     assert body["agent"] == "Bessie" and "I'm Bessie" in body["answer"]
@@ -327,7 +327,7 @@ def test_greetings_are_bessie_without_financial_context_or_network(local, monkey
 
 
 def test_explicit_wilbur_is_separate_from_bessie(local, monkeypatch):
-    h = login(local)
+    h = login(local, "E003")
     captured = []
     install_nvidia(monkeypatch, lambda req: captured.append(json.loads(req.content)) or completion(req))
     for agent, name in [("bessie", "Bessie"), ("wilbur", "Wilbur")]:
@@ -341,6 +341,12 @@ def test_explicit_wilbur_is_separate_from_bessie(local, monkeypatch):
         assert captured[-1]["chat_template_kwargs"]["enable_thinking"] is False
     denied = local.post("/staff/assistant", headers=h, json={"agent": "wilbur", "feature_id": "staff.audit", "question": "hi"})
     assert denied.status_code == 403
+    analyst = login(local)
+    removed = local.post("/staff/assistant", headers=analyst, json={
+        "agent": "wilbur", "feature_id": "staff.creditresearch", "question": "Explain utilization"})
+    assert removed.status_code == 403
+    assert local.post("/staff/assistant", headers=analyst, json={
+        "feature_id": "learn.explain", "question": "Explain utilization"}).status_code == 403
 
 
 def test_plain_conceptual_response_does_not_require_an_irrelevant_fact():
