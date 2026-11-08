@@ -1,5 +1,7 @@
 # Employee backend handoff
 
+**Current account/AI setup:** see [BESSIE_SETUP.md](BESSIE_SETUP.md). Normal sign-in now requires a provisioned email/password account. Demo login and auto-seeding are disabled; old sample logins below are historical. Bessie uses MISTRAL_API_KEY directly, without AGENT_PROVIDER. Existing financial data remains synthetic.
+
 **Current storage:** SQLAlchemy + local SQLite. See [SQLALCHEMY_SETUP.md](SQLALCHEMY_SETUP.md)
 for the schema, email accounts, all-role views and verification. Customer and employee
 logins now use one User directory and the same opaque token format. Tiger and Lab

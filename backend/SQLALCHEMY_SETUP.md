@@ -1,5 +1,7 @@
 # Local SQLAlchemy schema and role views
 
+**Current account/AI setup:** see [BESSIE_SETUP.md](BESSIE_SETUP.md). Normal sign-in now requires a provisioned email/password account. Demo login and auto-seeding are disabled; old sample logins below are historical. Bessie uses MISTRAL_API_KEY directly, without AGENT_PROVIDER. Existing financial data remains synthetic.
+
 The active app uses **SQLAlchemy 2 ORM + local SQLite**. SQLAlchemy is the model
 and query layer; SQLite stores the data in `backend/storage/finpilot_local.sqlite3`.
 No Tiger account, PostgreSQL server, API key, or Lab Package dataset is required.
