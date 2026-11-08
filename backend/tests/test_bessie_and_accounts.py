@@ -1,4 +1,4 @@
-"""Mistral contract, permission boundaries and normal employee-account lifecycle."""
+"""NVIDIA contract, permission boundaries and normal employee-account lifecycle."""
 import json
 
 import httpx
@@ -37,9 +37,9 @@ def run(client, headers, pid="P001"):
     return r.json()
 
 
-def install_mistral(monkeypatch, handler):
+def install_nvidia(monkeypatch, handler):
     original = httpx.Client
-    monkeypatch.setenv("MISTRAL_API_KEY", "test-secret-never-output")
+    monkeypatch.setenv("NVIDIA_API_KEY", "test-secret-never-output")
     monkeypatch.setattr(bessie.httpx, "Client", lambda **kw: original(transport=httpx.MockTransport(handler), **kw))
 
 
@@ -49,12 +49,14 @@ def completion(request, callback=None):
     key = next(iter(facts))
     if callback:
         callback()
-    return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps({
+    return httpx.Response(200, json={"choices": [{"finish_reason": "stop", "message": {"role": "assistant", "content": json.dumps({
         "answer": "The recorded evidence is {{"+key+"}}. Human review is required.",
         "reasons": [], "evidence_ids": [key], "limitations": ["Synthetic policy only."]})}}]})
 
 
-def test_live_adapter_receives_only_authorized_evidence(local, monkeypatch):
+@pytest.mark.parametrize("model", ["nemotron-3.5-super-vl-120b-a12b", bessie.DEFAULT_MODEL])
+def test_live_adapter_receives_only_authorized_evidence(local, monkeypatch, model):
+    monkeypatch.setenv("NVIDIA_MODEL", model)
     h = login(local)
     record = run(local, h)
     requests = []
@@ -62,15 +64,20 @@ def test_live_adapter_receives_only_authorized_evidence(local, monkeypatch):
     def handler(request):
         requests.append(request)
         return completion(request)
-    install_mistral(monkeypatch, handler)
+    install_nvidia(monkeypatch, handler)
     r = local.post("/staff/assistant", headers=h, json={"feature_id": "staff.creditresearch",
         "resource_id": record["id"], "question": "Why does this require review?"})
     assert r.status_code == 200, r.text
-    assert r.json()["provider"] == "mistral" and r.json()["validation"]["passed"]
+    assert r.json()["provider"] == "nvidia" and r.json()["validation"]["passed"]
     assert len(requests) == 1
     body = json.loads(requests[0].content)
     assert str(requests[0].url) == bessie.ENDPOINT
-    assert body["response_format"]["type"] == "json_schema"
+    assert body["response_format"]["type"] == "json_object"
+    assert body["model"] == bessie.DEFAULT_MODEL
+    assert body["stream"] is False
+    assert json.loads(body["messages"][1]["content"])["output_schema"]["additionalProperties"] is False
+    assert requests[0].headers["authorization"] == "Bearer test-secret-never-output"
+    assert "test-secret" not in str(requests[0].url)
     assert "tools" not in body
     context = body["messages"][1]["content"]
     assert "input_snapshot" not in context and "synthetic_name" not in context and "group_label" not in context
@@ -79,10 +86,10 @@ def test_live_adapter_receives_only_authorized_evidence(local, monkeypatch):
     assert denied.status_code == 403 and len(requests) == 1
 
 
-@pytest.mark.parametrize("status,expected", [(401, 503), (403, 503), (429, 503), (500, 502)])
+@pytest.mark.parametrize("status,expected", [(400, 502), (401, 503), (403, 503), (404, 503), (429, 503), (500, 502)])
 def test_provider_errors_do_not_leak_secrets(local, monkeypatch, status, expected):
     h = login(local)
-    install_mistral(monkeypatch, lambda req: httpx.Response(status, text="secret-upstream-body"))
+    install_nvidia(monkeypatch, lambda req: httpx.Response(status, text="secret-upstream-body"))
     r = local.post("/staff/assistant", headers=h, json={"feature_id": "staff.benefits", "question": "Explain my benefit cap"})
     assert r.status_code == expected
     assert "secret-upstream" not in r.text and "test-secret" not in r.text
@@ -93,10 +100,10 @@ def test_timeout_and_invalid_model_output_fail_honestly(local, monkeypatch):
 
     def timeout(req):
         raise httpx.ReadTimeout("timeout", request=req)
-    install_mistral(monkeypatch, timeout)
+    install_nvidia(monkeypatch, timeout)
     r = local.post("/staff/assistant", headers=h, json={"feature_id": "staff.benefits", "question": "Explain discounts"})
     assert r.status_code == 504
-    install_mistral(monkeypatch, lambda req: httpx.Response(200, json={"choices": [{"message": {"content": '{"answer":"Your balance is $999999"}'}}]}))
+    install_nvidia(monkeypatch, lambda req: httpx.Response(200, json={"choices": [{"finish_reason": "stop", "message": {"content": '{"answer":"Your balance is $999999"}'}}]}))
     r = local.post("/staff/assistant", headers=h, json={"feature_id": "staff.benefits", "question": "Invent a balance"})
     assert r.status_code == 502 and "999999" not in r.text
 
@@ -107,7 +114,7 @@ def test_role_revoked_while_model_runs_cannot_return_old_evidence(local, monkeyp
     def revoke():
         with Store() as store:
             store.db.get(User, "U-E001").role_key = "service_specialist"
-    install_mistral(monkeypatch, lambda req: completion(req, revoke))
+    install_nvidia(monkeypatch, lambda req: completion(req, revoke))
     r = local.post("/staff/assistant", headers=h, json={"feature_id": "staff.benefits", "question": "Explain the cap"})
     assert r.status_code == 403 and "citations" not in r.json()
 
@@ -197,3 +204,95 @@ def test_money_and_ratio_displays_are_rendered_by_code():
     cap = next(v for v in facts.values() if v["path"] == "remaining_cap_cents")
     utilization = next(v for v in facts.values() if v["path"] == "rules[0].value")
     assert cap["display"] == "$1,500.00" and utilization["display"] == "32%"
+
+
+@pytest.mark.parametrize("payload", [
+    {"choices": [{"finish_reason": "content_filter", "message": {"content": None}}]},
+    {"choices": [{"finish_reason": "length", "message": {"content": "partial"}}]},
+    {"choices": []},
+    {"choices": [{"finish_reason": "stop", "message": {"content": None, "refusal": "blocked"}}]},
+])
+def test_blocked_truncated_or_empty_outputs_are_not_returned(local, monkeypatch, payload):
+    h = login(local)
+    install_nvidia(monkeypatch, lambda req: httpx.Response(200, json=payload))
+    r = local.post("/staff/assistant", headers=h, json={"feature_id": "staff.benefits", "question": "Explain benefits"})
+    assert r.status_code == 502 and "answer" not in r.json()
+
+
+def test_model_configuration_cannot_redirect_the_key(local, monkeypatch):
+    h = login(local)
+    calls = []
+    install_nvidia(monkeypatch, lambda req: calls.append(req) or completion(req))
+    monkeypatch.setenv("NVIDIA_MODEL", "https://other-host.example/model")
+    r = local.post("/staff/assistant", headers=h, json={"feature_id": "staff.benefits", "question": "Explain benefits"})
+    assert r.status_code == 503 and calls == []
+
+
+def test_old_provider_keys_are_not_used_as_an_nvidia_key(local, monkeypatch):
+    h = login(local)
+    monkeypatch.setenv("NVIDIA_API_KEY", "")
+    monkeypatch.setenv("MISTRAL_API_KEY", "unused-old-secret")
+    monkeypatch.setenv("GEMINI_API_KEY", "unused-gemini-secret")
+    r = local.post("/staff/assistant", headers=h, json={"feature_id": "staff.benefits", "question": "Explain benefits"})
+    assert r.status_code == 503 and "NVIDIA_API_KEY" in r.json()["detail"]
+    assert "unused-old-secret" not in r.text
+
+
+def test_nvidia_thought_parts_are_never_exposed(local, monkeypatch):
+    h = login(local)
+
+    def handler(req):
+        response = completion(req)
+        payload = response.json()
+        payload["choices"][0]["message"]["reasoning_content"] = "private-model-thought"
+        return httpx.Response(200, json=payload)
+    install_nvidia(monkeypatch, handler)
+    r = local.post("/staff/assistant", headers=h, json={"feature_id": "staff.benefits", "question": "Explain benefits"})
+    assert r.status_code == 200 and "private-model-thought" not in r.text
+
+
+@pytest.mark.parametrize("question", ["hi", "hello", "Hi Bessie!", "what can you do", "help"])
+def test_greetings_are_bessie_without_financial_context_or_network(local, monkeypatch, question):
+    h = login(local)
+    calls = []
+    install_nvidia(monkeypatch, lambda req: calls.append(req) or completion(req))
+    response = local.post("/staff/assistant", headers=h, json={"feature_id": "learn.explain", "question": question})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["agent"] == "Bessie" and "I'm Bessie" in body["answer"]
+    assert "Wilbur" not in body["answer"] and "benefits-v1" not in body["answer"]
+    assert body["evidence"] == {} and calls == []
+
+
+def test_explicit_wilbur_is_separate_from_bessie(local, monkeypatch):
+    h = login(local)
+    captured = []
+    install_nvidia(monkeypatch, lambda req: captured.append(json.loads(req.content)) or completion(req))
+    for agent, name in [("bessie", "Bessie"), ("wilbur", "Wilbur")]:
+        response = local.post("/staff/assistant", headers=h, json={
+            "feature_id": "learn.explain", "agent": agent, "question": "Explain debt-to-income conceptually"})
+        assert response.status_code == 200, response.text
+        assert response.json()["agent"] == name
+        assert captured[-1]["messages"][0]["content"].startswith("You are "+name)
+        context = captured[-1]["messages"][1]["content"]
+        assert "remaining_cap_cents" not in context
+        assert captured[-1]["chat_template_kwargs"]["enable_thinking"] is False
+    denied = local.post("/staff/assistant", headers=h, json={"agent": "wilbur", "feature_id": "staff.audit", "question": "hi"})
+    assert denied.status_code == 403
+
+
+def test_plain_conceptual_response_does_not_require_an_irrelevant_fact():
+    result = bessie.validate_explanation({"answer": "Debt-to-income compares monthly debt payments with monthly income.",
+        "reasons": [], "evidence_ids": [], "limitations": []}, bessie.facts_for({"role": "credit_analyst"}))
+    assert result["citations"] == [] and result["validation"]["passed"]
+
+
+def test_home_chat_only_fetches_benefits_for_an_explicit_benefits_question(local, monkeypatch):
+    h = login(local)
+    captured = []
+    install_nvidia(monkeypatch, lambda req: captured.append(json.loads(req.content)) or completion(req))
+    for question, needs_benefits in [("Explain my workspace", False), ("What is my remaining benefit cap?", True)]:
+        response = local.post("/staff/assistant", headers=h, json={"feature_id": "staff.access", "question": question})
+        assert response.status_code == 200, response.text
+        context = captured[-1]["messages"][1]["content"]
+        assert ("remaining_cap_cents" in context) == needs_benefits

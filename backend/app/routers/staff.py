@@ -68,7 +68,8 @@ class Item(Body):
 
 
 class Ask(Body):
-    feature_id: str
+    feature_id: str = "staff.access"
+    agent: Literal["bessie", "wilbur"] = "bessie"
     resource_id: str | None = None
     question: str = Field(min_length=1, max_length=2000)
 
@@ -204,10 +205,11 @@ def logout(authorization: str = Header(), store=Depends(session)):
 @router.get("/me")
 def me(store=Depends(session)):
     store.audit("session_profile_read")
+    from app.agents.bessie import configured
     return {"employee": store.employee, "tabs": store.user.role.tabs,
             "features": store.user.role.features, "banner": BANNER,
             "storage": "sqlalchemy_sqlite", "user": public_user(store.user),
-            "agent_provider": "mistral" if os.environ.get("MISTRAL_API_KEY") else "unconfigured", "synthetic_demo": store.user.synthetic}
+            "agent_provider": "nvidia" if configured() else "unconfigured", "synthetic_demo": store.user.synthetic}
 
 
 @router.get("/registry")
@@ -560,8 +562,21 @@ def anomalies(store=Depends(session)):
 @router.post("/assistant")
 def assistant(body: Ask, store=Depends(session)):
     allow(store, body.feature_id)
+    if body.agent == "wilbur" and body.feature_id != "learn.explain":
+        fail(store, "Wilbur is available through Explain This", body.feature_id)
+    from app.agents.conversation import question_feature, welcome
+    greeting = welcome(body.question, store.user.role_key, body.agent)
+    if greeting:
+        store.audit("assistant_greeting", body.feature_id, agent=body.agent)
+        return {"agent": "Wilbur" if body.agent == "wilbur" else "Bessie",
+                "provider": "application", "status": "greeting", "answer": greeting,
+                "evidence": {}, "citations": [], "reasons": [], "limitations": [],
+                "validation": {"passed": True, "checks": ["role_scoped_greeting"]},
+                "trace": ["role_gate", "greeting"], "synthetic": True, "banner": BANNER}
+    feature = question_feature(body.question, body.feature_id)
+    allow(store, feature)
     evidence = {}
-    if body.feature_id == "learn.explain" and body.resource_id:
+    if feature == "learn.explain" and body.resource_id:
         if store.employee["role"] == "credit_analyst":
             row = run_for(store, body.resource_id)
         elif store.employee["role"] == "compliance_analyst":
@@ -570,44 +585,31 @@ def assistant(body: Ask, store=Depends(session)):
             fail(store, "Credit evidence explanations are not available for your role", body.resource_id)
         evidence = {"run_id": row["id"], "policy_version": row["policy_version"],
                     "rules": [r for r in row["rules"] if r["rule"] in ("dti", "utilization")]}
-        answer = ("Debt-to-income is existing monthly debt plus the proposed monthly payment, divided by monthly income. "
-                  "Credit utilization is revolving balance divided by revolving credit limit. "
-                  "The attached rule evidence shows the recorded value and synthetic policy threshold.")
-    elif body.feature_id in ("staff.creditresearch", "staff.prospect"):
-        if not body.resource_id:
-            raise HTTPException(422, "A research run ID is required")
+    elif feature in ("staff.creditresearch", "staff.prospect") and body.resource_id:
         row = run_for(store, body.resource_id)
         evidence = {k: row[k] for k in ("id", "outcome", "rules", "missing_inputs", "counterfactuals", "policy_version")}
-        answer = f"The recorded review outcome is {row['outcome']}. Code evaluated the stored synthetic policy; a human must record the decision."
-    elif body.feature_id == "staff.cases":
-        if not body.resource_id:
-            raise HTTPException(422, "A case ID is required")
+    elif feature == "staff.cases" and body.resource_id:
         row = assigned(store, "cases", body.resource_id)
-        if row["assigned_to"] != store.employee["id"]:
-            fail(store, "Case is not assigned to you", row["id"])
         evidence = {"id": row["id"], "consented_context": row["consented_context"]}
-        answer = "Review the consented context and ask which obligations are most urgent. Human review is required; no offer is promised."
-    elif body.feature_id in ("staff.benefits", "learn.explain"):
+    elif feature == "staff.benefits":
         summary = benefit_summary(store)
         evidence = {k: summary[k] for k in ("discount_rate_percent", "remaining_cap_cents", "rules")}
-        answer = "Benefits use tenure-based discounts, an annual discount cap and a quarterly item limit. Discounted price equals list price minus the allowed discount."
-    elif body.feature_id == "staff.portfolio":
+    elif feature == "staff.portfolio":
         evidence = portfolio(store)
-        answer = "Only aggregates allowed for your role are available. Groups smaller than five are suppressed."
-    elif body.feature_id == "staff.audit":
+    elif feature == "staff.audit":
         evidence = {"events": audit(limit=20, store=store)["events"]}
-    elif body.feature_id == "staff.fairness":
+    elif feature == "staff.fairness":
         evidence = fairness(store)
-    elif body.feature_id == "staff.decision":
+    elif feature == "staff.decision":
         evidence = {"decisions": decisions(store)["decisions"][-20:]}
-    elif body.feature_id == "staff.campaigns":
+    elif feature == "staff.campaigns":
         evidence = audience(store)
-    elif body.feature_id == "staff.anomaly":
+    elif feature == "staff.anomaly":
         evidence = anomalies(store)
-    elif body.feature_id == "staff.access":
-        evidence = {"role": store.user.role_key, "tabs": store.user.role.tabs, "features": store.user.role.features}
     else:
-        answer = "Use the role-scoped workspace endpoints for this feature. Mock Bessie does not interpret free text or perform mutations."
+        evidence = {"role": store.user.role_key, "tabs": store.user.role.tabs,
+                    "features": store.user.role.features,
+                    "context": "No financial record is selected. Answer general questions normally; ask the employee to select a record for personal figures."}
     from app.agents.bessie import AgentError, explain
     from app.orm.models import AuthSession, User
     original_role, user_id = store.user.role_key, store.user.id
@@ -615,7 +617,7 @@ def assistant(body: Ask, store=Depends(session)):
     # Do not hold SQLite's write lock across a network request.
     store.db.commit()
     try:
-        result = explain(body.question, original_role, body.feature_id, evidence)
+        result = explain(body.question, original_role, feature, evidence, agent=body.agent)
     except AgentError as exc:
         store.audit("assistant_failed", body.resource_id or body.feature_id, "failed", status=exc.status)
         raise HTTPException(exc.status, exc.message) from None
@@ -628,14 +630,14 @@ def assistant(body: Ask, store=Depends(session)):
         fail(store, "Your role changed. Refresh your workspace.", "assistant")
     from app.orm.identity import set_identity
     set_identity(store, current)
-    allow(store, body.feature_id)
+    allow(store, feature)
     if body.resource_id and (body.feature_id in ("staff.creditresearch", "staff.prospect") or
                             (body.feature_id == "learn.explain" and original_role == "credit_analyst")):
         run_for(store, body.resource_id)
-    if body.feature_id == "staff.cases":
+    if feature == "staff.cases" and body.resource_id:
         assigned(store, "cases", body.resource_id)
     store.audit("assistant_answer", body.resource_id or body.feature_id, feature=body.feature_id,
                 model=result["model"], prompt_version=result["prompt_version"])
-    return {**result, "agent": "Wilbur" if body.feature_id == "learn.explain" else "Bessie",
+    return {**result,
             "evidence": evidence, "synthetic": True, "banner": BANNER,
-            "trace": ["role_gate", "scoped_evidence", "deterministic_compute", "mistral_explain", "evidence_validation"]}
+            "trace": ["role_gate", "scoped_evidence", "deterministic_compute", "nvidia_explain", "evidence_validation"]}
