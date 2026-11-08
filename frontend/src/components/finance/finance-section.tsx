@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -96,40 +96,75 @@ export function AmeliaRail({
   featureId: string;
   hint: string;
 }) {
-  const [skill, setSkill] = useState(featureId);
+  const [skill, setSkill] = useState("fin.profile");
   const [question, setQuestion] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [turns, setTurns] = useState<{ question: string; answer: string }[]>([]);
+  const requestId = useRef(0);
+  const inFlight = useRef(false);
+  const tab = NAV.find((item) => VIEW_FEATURE[item.id] === featureId)?.label ?? "Finance";
+  const presetQuestions: Record<string, string> = {
+    "fin.profile": `What is the current picture of the ${tab} tab, and what is going on? Explain the key numbers and what I should notice.`,
+    "fin.xray": `Looking at ${tab}, what do my recorded financial health indicators mean, and which need attention?`,
+    "fin.futureyou": `Looking at ${tab}, what do my recorded projections suggest about my future finances? Explain the assumptions and limitations.`,
+    "fin.moneymission": `Looking at ${tab}, what practical savings and spending plan can I make from my recorded balances, income, and obligations?`,
+    "fin.immune": `If I get a financial shock, what is my plan of action? Use my recorded income, bills, emergency fund, and reserves, with the ${tab} tab as context.`,
+    "fin.moneyleaks": `Looking at ${tab}, where is money leaking through my recorded bills, subscriptions, or budget variance, and what should I review first?`,
+    "fin.debt": `Looking at ${tab}, what do my recorded debts, interest rates, and payments mean, and what should I prioritize?`,
+    "fin.coach": `Help me understand ${tab} in plain English. Based on my recorded finances, what should I focus on next and why?`,
+  };
+  useEffect(() => {
+    requestId.current += 1;
+    inFlight.current = false;
+    setSkill("fin.profile");
+    setQuestion("");
+    setError(null);
+    setTurns([]);
+    setPending(false);
+    return () => { requestId.current += 1; };
+  }, [featureId]);
   const prompts = [
-    "What should I notice first?",
-    "Do I still have an emergency cushion?",
-    "Where is money leaking?",
+    { label: "What should I notice first?", skill: "fin.profile" },
+    { label: "Do I still have an emergency cushion?", skill: "fin.immune" },
+    { label: "Where is money leaking?", skill: "fin.moneyleaks" },
   ];
   const ask = (text: string) => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed || inFlight.current) return;
+    inFlight.current = true;
+    const currentRequest = ++requestId.current;
     setPending(true);
     setError(null);
-    void askAmelia(skill, trimmed)
+    // Picture and free-form coaching follow the active tab's authorized evidence.
+    const evidenceFeature = skill === "fin.profile" || skill === "fin.coach" ? featureId : skill;
+    void askAmelia(evidenceFeature, trimmed)
       .then((row) => {
+        if (currentRequest !== requestId.current) return;
         setTurns((current) => [
           ...current,
           {
             question: trimmed,
-            answer: `${row.answer} (${row.provider} · ${row.status})`,
+            answer: [row.answer, ...row.reasons, ...row.limitations].join("\n\n"),
           },
         ]);
         setQuestion("");
       })
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Amelia could not answer."))
-      .finally(() => setPending(false));
+      .catch((err: unknown) => {
+        if (currentRequest === requestId.current) setError(err instanceof Error ? err.message : "Amelia could not answer.");
+      })
+      .finally(() => {
+        if (currentRequest === requestId.current) {
+          inFlight.current = false;
+          setPending(false);
+        }
+      });
   };
   return (
     <aside className="flex h-full w-full flex-col border-border bg-background p-4 lg:w-80 lg:border-l">
       <p className="font-display text-lg font-extrabold">Amelia</p>
       <p className="text-xs text-muted-foreground">
-        Mistral-backed explanations of your synthetic tracker. Not financial advice.
+        Explanations of your synthetic tracker. Not financial advice.
       </p>
       <p className="mt-2 text-xs text-muted-foreground">{hint}</p>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -138,7 +173,13 @@ export function AmeliaRail({
             key={item.id}
             type="button"
             className={`rounded-full border px-3 py-1 text-left text-xs ${skill === item.id ? "border-primary text-primary" : "border-border hover:border-primary"}`}
-            onClick={() => setSkill(item.id)}
+            disabled={pending}
+            aria-pressed={skill === item.id}
+            onClick={() => {
+              setSkill(item.id);
+              setQuestion(presetQuestions[item.id] ?? "");
+              setError(null);
+            }}
           >
             {item.label}
           </button>
@@ -147,12 +188,17 @@ export function AmeliaRail({
       <div className="mt-3 flex flex-wrap gap-2">
         {prompts.map((prompt) => (
           <button
-            key={prompt}
+            key={prompt.label}
             type="button"
             className="rounded-full border border-border px-3 py-1 text-left text-xs hover:border-primary"
-            onClick={() => ask(prompt)}
+            disabled={pending}
+            onClick={() => {
+              setSkill(prompt.skill);
+              setQuestion(`${prompt.label} Use my recorded finances, with the ${tab} tab as context.`);
+              setError(null);
+            }}
           >
-            {prompt}
+            {prompt.label}
           </button>
         ))}
       </div>
@@ -163,7 +209,7 @@ export function AmeliaRail({
         {turns.map((turn, index) => (
           <article key={index} className="rounded-2xl border border-border p-3 text-sm">
             <p className="font-display font-bold">{turn.question}</p>
-            <p className="mt-1 text-muted-foreground">{turn.answer}</p>
+            <p className="mt-1 whitespace-pre-line text-muted-foreground">{turn.answer}</p>
           </article>
         ))}
       </div>
@@ -179,6 +225,7 @@ export function AmeliaRail({
           onChange={(event) => setQuestion(event.target.value)}
           placeholder="Ask Amelia"
           aria-label="Ask Amelia"
+          disabled={pending}
           rows={3}
         />
         {error && <p className="text-sm text-destructive">{error}</p>}

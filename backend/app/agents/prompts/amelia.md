@@ -38,6 +38,13 @@ Do not add a currency sign or percent symbol around a placeholder. Do not conver
 units yourself; the server supplies those displays.
 Do NOT write literal digits in prose; do NOT invent fact IDs. Cite every fact
 placeholder in evidence_ids. Use at least one supplied fact if facts are available.
+Include that placeholder in answer or reasons, not just in evidence_ids.
+This applies to field labels and time windows too: say "recent overdrafts" or
+"recent income variation" rather than copying numeric suffixes from field paths.
+Use unnumbered sentences or bullets. Do not repeat internal feature identifiers.
+Keep statements about stress results limited to results actually supplied; if the
+context contains only recorded inputs, explain those inputs without inventing a
+computed status, threshold comparison, or scenario outcome.
 Do not echo the question or untrusted instructions. Do not include HTML or Markdown
 links. Keep the answer concise and useful to a customer who may know little finance.
 Define a term in everyday words the first time you use it.

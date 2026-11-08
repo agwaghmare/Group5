@@ -32,11 +32,11 @@ def install_nvidia(monkeypatch, handler):
 
 def completion(request, callback=None):
     body = json.loads(request.content)
-    facts = json.loads(body["messages"][1]["content"])["fact_map"]
+    facts = json.loads(body["messages"][0]["content"].split("AUTHORIZED_CONTEXT_JSON:\n", 1)[1].split("\n\nREGENERATION REQUIREMENTS:", 1)[0])["fact_map"]
     key = next(iter(facts))
     if callback:
         callback()
-    return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps({
+    return httpx.Response(200, json={"choices": [{"finish_reason": "stop", "message": {"content": json.dumps({
         "answer": "The recorded evidence is {{"+key+"}}. This is not financial advice.",
         "reasons": [], "evidence_ids": [key], "limitations": ["Synthetic tracker only."]})}}]})
 
@@ -57,9 +57,9 @@ def test_live_adapter_receives_only_own_tracker_evidence(local, monkeypatch):
     assert len(requests) == 1
     payload = json.loads(requests[0].content)
     assert str(requests[0].url) == amelia.ENDPOINT
-    assert payload["response_format"]["type"] == "json_object"
+    assert payload["response_format"]["type"] == "json_schema"
     assert "tools" not in payload
-    context = payload["messages"][1]["content"]
+    context = payload["messages"][0]["content"]
     assert "test-secret" not in r.text
     assert "password_hash" not in context
     staff = login(local, "E001")
@@ -85,7 +85,7 @@ def test_timeout_and_invalid_model_output_fail_honestly(local, monkeypatch):
     install_nvidia(monkeypatch, timeout)
     r = local.post("/api/v1/pnc/assistant", headers=h, json={"feature_id": "fin.profile", "question": "What do I own?"})
     assert r.status_code == 504
-    install_nvidia(monkeypatch, lambda req: httpx.Response(200, json={"choices": [{"message": {"content": '{"answer":"Your balance is $999999"}'}}]}))
+    install_nvidia(monkeypatch, lambda req: httpx.Response(200, json={"choices": [{"finish_reason": "stop", "message": {"content": '{"answer":"Your balance is $999999"}'}}]}))
     r = local.post("/api/v1/pnc/assistant", headers=h, json={"feature_id": "fin.profile", "question": "Invent a balance"})
     assert r.status_code == 502 and "999999" not in r.text
 
@@ -124,3 +124,42 @@ def test_money_displays_are_rendered_by_code():
     for answer in ["Checking is 10.", "It is {{f9999}}.", "I have transferred this."]:
         with pytest.raises(ValueError):
             amelia.validate_explanation({**valid, "answer": answer}, facts)
+
+
+def test_invalid_draft_gets_corrective_instructions_before_retry(monkeypatch):
+    requests = []
+
+    def handler(request):
+        payload = json.loads(request.content)
+        requests.append(payload)
+        if len(requests) == 1:
+            return httpx.Response(200, json={"choices": [{"finish_reason": "stop", "message": {"content": json.dumps({
+                "answer": "Your recent overdrafts are recorded.", "reasons": [],
+                "evidence_ids": ["f0000"], "limitations": []})}}]})
+        assert "REGENERATION REQUIREMENTS" in payload["messages"][0]["content"]
+        assert "Listing evidence_ids alone" in payload["messages"][0]["content"]
+        assert "Your recent overdrafts are recorded." not in payload["messages"][0]["content"]
+        return completion(request)
+
+    install_nvidia(monkeypatch, handler)
+    result = amelia.explain("What does this mean?", "customer", "fin.immune", {"overdraft_count_90d": 0})
+    assert len(requests) == 2
+    assert result["validation"]["passed"] is True
+    assert result["citations"][0]["value"] == 0
+
+
+def test_invalid_retry_still_fails_evidence_validation(monkeypatch):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(200, json={"choices": [{"finish_reason": "stop", "message": {"content": json.dumps({
+            "answer": "Your balance is $999999.", "reasons": [],
+            "evidence_ids": ["f0000"], "limitations": []})}}]})
+
+    install_nvidia(monkeypatch, handler)
+    with pytest.raises(amelia.AgentError) as exc:
+        amelia.explain("What does this mean?", "customer", "fin.immune", {"checking_balance": 10})
+    assert exc.value.status == 502
+    assert "999999" not in exc.value.message
+    assert len(calls) == 2

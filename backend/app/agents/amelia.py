@@ -178,7 +178,18 @@ def explain(question, role, feature, evidence):
             except (ValueError, TypeError, ValidationError):
                 if attempt:
                     raise
-                continue
+                # Correct the format without echoing the invalid draft or its claims.
+                request["messages"][0]["content"] += (
+                    "\n\nREGENERATION REQUIREMENTS: The previous draft failed validation. "
+                    "Return all four JSON fields. Include at least one {{f0000}}-style "
+                    "placeholder from the supplied fact_map in answer or reasons, and list "
+                    "every referenced ID in evidence_ids. Listing evidence_ids alone is "
+                    "insufficient. Do not write literal digits anywhere in answer, reasons "
+                    "or limitations, including time-window labels, numbered lists, dates "
+                    "or feature names. Say 'recent overdrafts' instead of a numeric day "
+                    "window. Do not add dollar signs or percent signs around placeholders. "
+                    "Explain only supplied facts and omit conclusions not computed in evidence."
+                )
         else:
             raise AgentError(502, "Amelia's response did not pass evidence validation. No unsupported answer was returned.")
     except httpx.TimeoutException as exc:
@@ -188,4 +199,4 @@ def explain(question, role, feature, evidence):
     except (ValueError, KeyError, IndexError, TypeError, ValidationError) as exc:
         raise AgentError(502, "Amelia's response did not pass evidence validation. No unsupported answer was returned.") from exc
     return {**result, "provider": "nvidia", "model": model, "status": "evidence_validated",
-            "prompt_version": "amelia-v1"}
+            "prompt_version": "amelia-v2"}
