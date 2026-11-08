@@ -5,6 +5,8 @@ description: Build, extend, debug, test, and demo FinPilot, an exclusively PNC-f
 
 # FinPilot: Engineering and Product Skill
 
+**Current implementation override (user decision):** use SQLAlchemy models with a local SQLite database instead of TigerData. Users have unique normalized email addresses and database-assigned roles. Customer finance comes exclusively from `data/personal_finance_tracker_dataset.csv`, preserving all columns and snapshot history. Do not load `Lab_Package` or `data/lab_package_demo`. The role/view matrix below still applies; SQLite access is enforced by the backend's scoped queries, not PostgreSQL roles or RLS. Older Tiger/Lab schema and pipeline descriptions below are reference material, superseded for the active app by this decision. See `backend/SQLALCHEMY_SETUP.md`.
+
 > **SCOPE CHANGE (2026-11-07): the employee/staff side is dropped for now. The active milestone is CUSTOMER-ONLY.**
 > Everything in this file that describes the PNC employee workspace (credit research, cases, portfolio, marketing, compliance,
 > benefits, staff roles, the Staff/Bessie boundary, Section 7.3 to 7.5, the staff parts of 3.5 and 9.5, and the staff items
