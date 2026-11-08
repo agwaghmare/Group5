@@ -9,8 +9,10 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
-// The Learn backend (FastAPI, ./backend) runs separately. In dev, /api/* is proxied to it so the
-// browser talks to one origin. Override the target with LEARN_API_URL when the API uses another port.
+// Backends run separately. In dev the browser talks to one Vite origin; paths are proxied.
+//   /api/v1/*  → PNC customer API (override with PNC_API_URL; default :8002)
+//   /api/*     → Learn API (override with LEARN_API_URL; default :8010; /api prefix stripped)
+const pncApi = process.env["PNC_API_URL"] ?? "http://127.0.0.1:8002";
 const learnApi = process.env["LEARN_API_URL"] ?? "http://127.0.0.1:8010";
 
 export default defineConfig({
@@ -22,6 +24,9 @@ export default defineConfig({
   vite: {
     server: {
       proxy: {
+        "/api/v1": {
+          target: pncApi,
+        },
         "/api": {
           target: learnApi,
           rewrite: (path: string) => path.replace(/^\/api/, ""),

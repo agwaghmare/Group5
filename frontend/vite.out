@@ -1,0 +1,19 @@
+
+> dev
+> vite dev
+
+8:14:06 PM [vite] (client) Re-optimizing dependencies because vite config has changed
+
+  VITE v8.1.5  ready in 2918 ms
+
+  ➜  Local:   http://localhost:8080/
+  ➜  Network: http://10.176.209.94:8080/
+8:14:13 PM [vite] (ssr) connected.
+8:22:43 PM [vite] (client) hmr update /src/styles.css?direct, /src/components/finance/finance-section.tsx
+8:22:43 PM [vite] (ssr) page reload src/components/finance/finance-section.tsx
+8:22:43 PM [vite] (ssr) program reload
+8:22:54 PM [vite] (client) hmr update /src/styles.css?direct, /src/routes/finance.tsx, /src/routes/finance.tsx?tsr-split=component
+8:22:54 PM [vite] (ssr) page reload src/routes/finance.tsx
+8:33:02 PM [vite] (client) hmr update /src/styles.css?direct, /src/components/finance/finance-section.tsx
+8:33:03 PM [vite] (ssr) page reload src/lib/finance-api.ts
+8:33:03 PM [vite] (ssr) program reload

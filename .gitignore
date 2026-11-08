@@ -29,3 +29,17 @@ frontend/dist/
 # Local tooling
 .run/
 .vscode/
+
+# Secrets and local artifacts
+backend/.env
+.env
+backend/mlruns/
+backend/models/
+backend/.pytest_cache/
+.ruff_cache/
+.hypothesis/
+data/lab_package_demo/_quarantine/
+
+backend/mlflow.db
+backend/mlruns/
+backend/models/

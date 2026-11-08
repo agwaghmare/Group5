@@ -1,9 +1,15 @@
 ---
 name: finpilot-hackathon-engineering
-description: Build, extend, debug, test, and demo FinPilot, an AI financial decision platform with two customer agents (Amelia for Personal Finance, Wilbur for Learn) and one employee copilot (Bessie for Staff, with role-based access for PNC employees) for PNC's 360° Financial Health Navigator. Use for FinPilot architecture, the wheel-navigation frontend, agent and feature routing, financial models, integrations, and hackathon judge demos. The REGISTRY section is the source of truth for agents, features, and wheel tabs; edit it first when ideas change. Preserve the existing repository and never claim planned features are implemented without verification.
+description: Build, extend, debug, test, and demo FinPilot, an exclusively PNC-focused financial intelligence platform (PNC 360° Financial Health Navigator plus a PNC employee workspace). The current milestone is BACKEND ONLY (typed Python services, TigerData, FastAPI); the future frontend integrates through three boundaries (Amelia for Personal Finance, Wilbur for Learn, Bessie for Staff) that are NOT implemented as agents yet. Use for FinPilot architecture, financial models, the PNC data contract, credit-research policy, role security, API contracts, and the later wheel-navigation frontend. The REGISTRY section is the source of truth for features, boundaries, tabs, and roles; edit it first when ideas change. Section 17 records the backend contract, the product-scope migration, and verified status. Never claim planned features are implemented without verification.
 ---
 
 # FinPilot: Engineering and Product Skill
+
+> **SCOPE CHANGE (2026-11-07): the employee/staff side is dropped for now. The active milestone is CUSTOMER-ONLY.**
+> Everything in this file that describes the PNC employee workspace (credit research, cases, portfolio, marketing, compliance,
+> benefits, staff roles, the Staff/Bessie boundary, Section 7.3 to 7.5, the staff parts of 3.5 and 9.5, and the staff items
+> in 14 and 15) is **retired from the current build and kept only as a design record**. It is not implemented in the code.
+> Nothing in the staff sections may be claimed as working. Section 17 states exactly what was removed and what remains.
 
 ## 0. How to read this file (for the LLM)
 
@@ -23,6 +29,8 @@ Build **FinPilot** as a polished, trustworthy, working prototype with one cockpi
 | **Staff Copilot** | **Bessie** | Helps PNC employees do their jobs inside their role: credit research, handoff cases, portfolio views, compliance review, benefits | The employee side of the **PNC** track; PNC judge guidance says a strong employee side sets us apart (Section 5.4) |
 
 Pilot names nod to aviation pioneers (Amelia Earhart, Wilbur Wright, Bessie Coleman) to match the "pilot / cockpit" brand. They are display names only and live in one registry column (Section 3.2).
+
+**Backend milestone scope (current).** FinPilot is PNC-only. This milestone builds only the backend: deterministic financial services, data pipelines, TigerData persistence, role security, ML pipelines, and a typed REST API. The three agents above are **future integration boundaries**: no conversational agents, LangGraph orchestration, LLM calls, voice, wheel frontend, Solana, real transfers, automated lending decisions, or production PNC integrations are built. Every feature is first an independent typed Python service; later agents call those services and never recompute numbers. The sponsor dataset's `auto_loan` account type stays as an ordinary consumer debt account, and the generic hypothetical car-purchase affordability what-if stays in FutureYou; neither depends on any automotive product.
 
 Design promise: **"Your money, piloted."** and **"One cockpit for everything you own, owe and plan."** (taken from the built landing page).
 
@@ -257,11 +265,13 @@ Source: the `Lab_Package/` folder of the same hackathon repo (instructor lab: RE
 
 **Sponsor's eight indicators (lab deck).** Cash surplus; emergency-fund months; debt-payment-to-income; credit utilization; savings rate; partial net worth; liquidity-to-debt; upcoming obligations / scenario exposure. (The root `wellness/metrics.py` computes a slightly different eight: emergency-fund months, debt-to-income, savings rate, credit utilization, net worth, debt-to-asset, housing-cost ratio, liquidity ratio.) FinPilot's set is the **union**, plus subscription burden (see 7.1).
 
+**Lab_Package availability (verified in this repo audit).** Neither the sponsor `Lab_Package/` folder nor the root `wellness/` toolkit (including `generate_data.py` and `generate_history.py`) exists in this repository, and there is no sponsor `profiles.csv`, `accounts.csv`, `transactions.csv`, `monthly_statements.csv`, or `history_manifest.json`. The only PNC dataset present is `data/personal_finance_tracker_dataset.csv` (500 synthetic users x 6 months, a different dataset, kept as is). Until the sponsor files are dropped in, the backend builds a **separately labeled substitute**: `backend/pnc_data/generate_demo_package.py` writes `data/lab_package_demo/` following the contract below (C001 to C030, 196 accounts, eight account types, 24 months from 2024-11-01 to 2026-10-31, one statement per account-month so 4,704 statements) using the sponsor seeds 20261107 (snapshots) and 20261108 (history). Every row carries `source_type = synthetic_demo_substitute`; the manifest records that it is not the sponsor data and that its transaction count is whatever the generator produced (the sponsor's 21,225 cannot be reproduced without their generator). The ingestion pipeline accepts real sponsor files in the same layout without code changes.
+
 **Dataset contract (Lab_Package `data/`).**
 - 30 synthetic customers (`C001` to `C030`), 196 accounts across 8 types: checking, savings, CD, IRA, credit card, auto loan, personal loan, mortgage. Files: `profiles.csv`, `accounts.csv`, `transactions.csv` (21,225 entries), `monthly_statements.csv` (4,704), `history_manifest.json`. History spans 2024-11-01 to 2026-10-31 (24 months).
 - Reproducible: `generate_data.py` (seed 20261107, regenerates snapshots and history) and `generate_history.py` (seed 20261108). Same seed gives the same data.
 - Transaction fields: `transaction_id`, `customer_id`, `account_id`, `account_type`, `posted_date`, `transaction_type`, `category`, `description`, `amount` (positive), `balance_change` (signed), `balance_after`, `flow_class` (`income`, `expense`, `internal_transfer`, `external_transfer`, `non_cash`), `transfer_id`. Existing categories include payroll, groceries, housing, utilities, transport, dining, shopping, other_spending, debt_payment, debt_interest, savings and investment contributions, and fees. **There is no merchant or payee field**; anything that needs one is an extension and must be labeled synthetic.
-- Accounting conventions to preserve: assets and liabilities are both stored as positive balances; internal transfers are paired and excluded from spending; debt payments are counted on the liability side only (never as new spending, to avoid double-counting); explicit `external_cash_management` flows are artificial calibration and not evidence of saving behavior; every account's final statement reconciles to its `accounts.csv` balance.
+- Accounting conventions to preserve: assets and liabilities are both stored as positive balances; internal transfers are paired and excluded from spending; no payment is double-counted: a loan payment is counted once, as debt service on the cash (checking) leg, while its paired liability-side leg is `non_cash`; a credit-card payment is the settlement of card purchases that are already counted as consumption and is never added to outflow again; interest postings are `non_cash`; and none of these are ever treated as new spending; explicit `external_cash_management` flows are artificial calibration and not evidence of saving behavior; every account's final statement reconciles to its `accounts.csv` balance.
 - Deliberate limitations to keep visible in the UI: data is intentionally incomplete (no home values, external assets, or taxes), so net worth is **partial**; liquidity counts checking and savings only (CDs and IRAs are not liquid); the savings rate comes from profile assumptions, not measured history; IRA growth is a simplified teaching model (no market returns or eligibility rules); the purchase simulator omits taxes, insurance, maintenance, and fees and must say so. Not for underwriting, trading, or investment advice.
 
 **Reusable assets and where they fit.**
@@ -666,3 +676,51 @@ Conclude every substantial coding task with:
 - **Data/integrations:** live, sandbox, synthetic, user-entered, or stubbed.
 - **Registry changes:** any edits to Section 3 and why.
 - **Not completed:** limitations, missing dependencies, blockers.
+
+## 17. Backend contract, scope migration, and verified status (customer-only milestone)
+
+### 17.1 Scope migration (documented, nothing silently deleted)
+
+| Change | Detail |
+| --- | --- |
+| Toyota / TFS | All Toyota/TFS code, docs, and database objects were removed earlier. Thirteen Toyota files under `data/` were locked by the OS and need manual deletion. PNC data was left untouched. |
+| Employee/staff side | **Removed from the code on 2026-11-07 at the user's request.** Deleted: `app/pnc/staff/` (research, cases, benefits, portfolio, compliance, seed), `app/pnc/credit/` (the 8-rule synthetic policy), the staff API router, staff CLI commands, and the staff tests. A zip backup of the removed files is kept in the agent's own store, outside the repository. |
+| Kept from the staff side | Shared domain errors moved to `app/pnc/errors.py`. The per-customer health-snapshot builder moved to `app/pnc/features/health_snapshots.py`. |
+| Database | **Not changed.** The employee-side tables, roles, functions and policies created by migrations 0001 to 0004 still exist in TigerData and are unused. Customers are denied access to them at the database level (tested). Removing them needs a new reversible migration, which has not been written. |
+| Fraud handoff | `POST /fraud/cases` still writes a row to the `cases` table so a future service workspace can pick it up. Nobody works those cases in the current build. |
+
+### 17.2 What the customer backend is
+
+- Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic (head `0004`), psycopg 3, TigerData (Timescale) with row-level security.
+- **API:** `/api/v1/pnc` with 35 customer routes (profile, accounts, transactions, account history, X-Ray, health indicators, cash flow, upcoming obligations, balance and stress forecasts, purchase and comparison scenarios, goals CRUD and plan, safe-spend, missions, recurring charges, subscription burden, spending trends, rewards comparison, debt amortization, payoff, refinance and consolidation, anomaly events, fraud cases, consents), plus `/api/v1/auth/dev-login`, `/health`, `/health/db`, and the existing Learn API.
+- **Identity:** the role and organisation come from the signed token and are re-checked against the database on every request. They are never read from a request body. Each request runs in a transaction as the `app_customer` database role with `app.customer_id` set, so Postgres decides which rows are visible. Demo login is development-only and is disabled when `APP_ENV=prod`. In production, startup fails on the default JWT secret or a missing `DATABASE_URL`.
+- **Data:** the sponsor `Lab_Package` / `wellness` data was not available, so a separately labeled synthetic demo package is used (`source_type = synthetic_demo_substitute`): 30 customers (C001 to C030), 196 accounts of 8 types, 4,704 statements over 24 months (2024-11-01 to 2026-10-31), and **23,718 transactions** (the sponsor figure of 21,225 is not reproducible). Seeds 20261107 and 20261108. The data skews financially healthy.
+- **Pipeline:** Bronze (file hash and metadata), Silver (Pandera validation with a quarantine table, never repaired), Gold (balance history, income history, recurring obligations, SQL views). Re-ingesting unchanged files is a no-op.
+- **Accounting rules as built:** consumption = card purchases plus debit spending, counted once; loan payments counted once as debt service on the checking leg; card payments are settlements and never added to outflow; interest postings are `non_cash`; internal transfers are paired and excluded; external transfers are artificial and excluded.
+- **Finance engine:** Decimal money, typed evidence objects with deterministic calculation ids, rates stored as fractions.
+- **ML:** cash-flow forecast chosen by rolling-origin backtest (baselines beat LightGBM, so the best baseline, a 6-month mean, is served). Isolation Forest anomaly flags are evaluated only on synthetic injected anomalies. No real fraud labels exist. Model selection is an offline job (`pnc ml train-cashflow`), and the request path uses only the caller's own RLS-scoped history.
+- **Jobs and CLI:** `pnc_jobs` records idempotency key, retries and status. CLI: `pnc data validate|ingest|reconcile|build-features|status`, `pnc seed demo-data`, `pnc finance verify|calculate-indicators|forecast|run-scenario`, `pnc ml train-cashflow|train-anomalies|evaluate`, `pnc jobs list`, `pnc test all`.
+
+### 17.3 Verified status (run on 2026-11-07 against the live TigerData service)
+
+| Claim | Evidence |
+| --- | --- |
+| Full backend test suite | **222 passed, 0 failed** (includes the opt-in concurrency and fraud-write tests). `ruff check` is clean. |
+| Customer isolation by RLS | Tests connect as `app_customer` and confirm only own rows are visible across 13 customer tables, no rows with an empty context, no read of `vulnerable_flag` or `audit_log`, no writes to ledger tables, no forged audit rows, and no write of another customer's goal (specific 42501 error). Employee-side tables are closed to customers. |
+| API authorization | Forged, wrong-role, wrong-organisation, unknown-customer and missing tokens are rejected with 401. Employee ids cannot log in. A customer cannot read another customer's account, goal, or transaction by id. |
+| Every GET route | Swept for four different customers (C001, C007, C015, C030) with 200 responses. |
+| Behavior | Pagination and filters, goal lifecycle, scenario math (the $30,000 / $5,000 down / 8% / 60-month example gives a $506.91 payment), zero-APR and cash purchases, refinance, consolidation, consent round trip, and the fraud handoff (consent required, foreign transaction refused). |
+| Defects found and fixed this milestone | A purchase scenario with a down payment above the price was silently accepted (now 422, in both the API and the engine model). Refinance and consolidation returned 422 for an unknown or foreign account (now 404). |
+| Reproducibility | Regenerating the demo package gives an identical dataset hash (`2dae533ad4b7`). |
+| Reconciliation | `pnc data reconcile` passes all checks. |
+| Job idempotency and retry | Tested: the same key returns the stored result without re-running, a flaky job succeeds on the third attempt, and a job fails after the attempt limit with the error recorded. |
+
+### 17.4 Not verified or not done
+
+- **Docker image build:** not verified (the Docker engine was not running). `docker compose config` accepts the compose file.
+- **Celery and Redis:** `app/pnc/celery_app.py` is written but untested. Jobs run in-process.
+- **GitHub Actions:** `.github/workflows/backend-ci.yml` is written but has never run. The database job needs a `DATABASE_URL` repository secret.
+- **Database hardening:** the API connects with the owner credential and switches with `SET LOCAL ROLE`. A dedicated login role for the API is recommended before any real deployment.
+- **Credentials:** the database password was shared in chat and should be rotated.
+- **Data limits:** all data is synthetic, the population skews healthy, and the sponsor package was unavailable.
+- **Retired scope:** the employee workspace is not implemented. Frontend, wheel navigation, voice, Solana, agents and LLMs are also not built.

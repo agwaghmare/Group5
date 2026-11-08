@@ -1,0 +1,31 @@
+customer_id,display_name,age,city,pay_frequency,annual_income,income_sources_count,credit_score,essential_spending_ratio,savings_rate_assumption,marketing_consent,vulnerable_flag,preferred_channel,source_type
+C001,Alex Adler,30,Detroit,semimonthly,77300.0,2,748,0.48,0.06,True,False,email,synthetic_demo_substitute
+C002,Blake Dalton,36,Baltimore,semimonthly,38500.0,1,681,0.42,0.18,True,False,mail,synthetic_demo_substitute
+C003,Casey Gallo,53,Cincinnati,biweekly,70900.0,1,625,0.5,0.08,False,False,email,synthetic_demo_substitute
+C004,Drew Jensen,68,Atlanta,biweekly,54700.0,1,830,0.5,0.08,True,False,email,synthetic_demo_substitute
+C005,Emery Carver,39,Pittsburgh,semimonthly,57900.0,1,786,0.45,0.03,True,False,phone,synthetic_demo_substitute
+C006,Finley Foster,48,Cincinnati,semimonthly,57900.0,1,707,0.58,0.02,True,False,phone,synthetic_demo_substitute
+C007,Gray Irwin,57,Atlanta,semimonthly,94400.0,1,748,0.58,0.02,True,True,phone,synthetic_demo_substitute
+C008,Harper Brooks,23,Cleveland,semimonthly,85800.0,1,612,0.5,0.08,False,False,email,synthetic_demo_substitute
+C009,Indy Ellis,40,Cincinnati,biweekly,40800.0,1,776,0.5,0.08,False,False,phone,synthetic_demo_substitute
+C010,Jules Hayes,45,Chicago,semimonthly,69700.0,2,733,0.48,0.06,True,False,email,synthetic_demo_substitute
+C011,Kai Adler,27,Columbus,semimonthly,76800.0,1,737,0.58,0.02,True,False,phone,synthetic_demo_substitute
+C012,Lane Dalton,53,Louisville,weekly,62800.0,1,774,0.5,0.08,True,False,email,synthetic_demo_substitute
+C013,Morgan Gallo,53,Atlanta,biweekly,68700.0,2,748,0.45,0.03,True,False,email,synthetic_demo_substitute
+C014,Noel Jensen,55,Pittsburgh,semimonthly,53700.0,1,759,0.45,0.03,False,False,mail,synthetic_demo_substitute
+C015,Oakley Carver,30,St. Louis,monthly,52400.0,2,664,0.5,0.08,True,False,sms,synthetic_demo_substitute
+C016,Parker Foster,69,Columbus,biweekly,99300.0,1,761,0.58,0.02,True,False,phone,synthetic_demo_substitute
+C017,Quinn Irwin,34,Charlotte,biweekly,129400.0,1,748,0.58,0.02,True,False,sms,synthetic_demo_substitute
+C018,Reese Brooks,45,Louisville,semimonthly,36800.0,2,736,0.5,0.08,True,False,phone,synthetic_demo_substitute
+C019,Sage Ellis,47,Louisville,biweekly,146500.0,1,747,0.45,0.03,False,False,email,synthetic_demo_substitute
+C020,Tatum Hayes,25,Philadelphia,monthly,41700.0,1,669,0.5,0.08,True,False,sms,synthetic_demo_substitute
+C021,Alex Adler,30,Atlanta,biweekly,102100.0,1,802,0.42,0.18,True,False,email,synthetic_demo_substitute
+C022,Blake Dalton,57,Cleveland,biweekly,92400.0,1,651,0.45,0.03,False,False,email,synthetic_demo_substitute
+C023,Casey Gallo,55,Atlanta,monthly,100200.0,1,737,0.58,0.02,False,False,mail,synthetic_demo_substitute
+C024,Drew Jensen,60,Cleveland,biweekly,50100.0,1,747,0.42,0.18,False,False,phone,synthetic_demo_substitute
+C025,Emery Carver,41,Charlotte,semimonthly,43100.0,1,639,0.5,0.08,True,True,sms,synthetic_demo_substitute
+C026,Finley Foster,69,Louisville,biweekly,41100.0,1,791,0.42,0.18,True,False,email,synthetic_demo_substitute
+C027,Gray Irwin,32,Chicago,biweekly,45000.0,2,756,0.48,0.06,False,False,sms,synthetic_demo_substitute
+C028,Harper Brooks,26,Detroit,monthly,94600.0,1,751,0.5,0.08,True,False,sms,synthetic_demo_substitute
+C029,Indy Ellis,68,Pittsburgh,biweekly,43900.0,1,824,0.45,0.03,True,False,sms,synthetic_demo_substitute
+C030,Jules Hayes,65,Cleveland,semimonthly,85200.0,2,650,0.48,0.06,True,True,phone,synthetic_demo_substitute

@@ -1,0 +1,419 @@
+The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
+8:14:59 PM [vite] (client) [console.error] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <MatchInnerImpl match={{id:"__root__/", ...}}>
+      <RootComponent>
+        <QueryClientProvider client={{}} data-tsd-source="/src/route...">
+          <OutletImpl data-tsd-source="/src/route...">
+            <Suspense fallback={null}>
+              <MatchImpl routeId="/finance">
+                <MatchView router={{...}} match={{id:"/finan...", ...}}>
+                  <MatchInnerImpl match={{id:"/finan...", ...}}>
+                    <Lazy>
+                      <FinancePage>
+                        <div className="flex h-dvh..." data-tsd-source="/src/route...">
+                          <FinpilotHeader miniWheel={true} data-tsd-source="/src/route...">
+                            <header className="flex items..." data-tsd-source="/src/compo...">
+                              <_c asChild={true} variant="ghost" className="h-auto p-0..." ...>
+                                <Slot.Slot className={"inline-f..."} ref={null} data-tsd-source="/src/compo...">
+                                  <a
+                                    onClick={function handleClick}
+                                    data-tsd-source="/src/components/finpilot-header.tsx:9:9"
+                                    className={"inline-flex items-center justify-center gap-2 whitespace-nowrap round..."}
+                                    ref={{current:null}}
+                                    onBlur={function handleLeave}
+                                    onFocus={function}
+                                    onMouseEnter={function}
+                                    onMouseLeave={function handleLeave}
+                                    onTouchStart={function handleTouchStart}
+                                    href="/"
+                                    target={undefined}
+-                                   data-cursor-ref="e0"
+                                  >
+                              <nav className="flex items..." data-tsd-source="/src/compo...">
+                                <_c asChild={true} variant="ghost" size="icon" className="text-primary" ...>
+                                  <Slot.Slot className={"inline-f..."} ref={null} title="Return to ..." ...>
+                                    <a
+                                      data-tsd-source="/src/components/finpilot-header.tsx:18:13"
+                                      className={"inline-flex items-center justify-center gap-2 whitespace-nowrap rou..."}
+                                      title="Return to wheel navigation"
+                                      aria-label="Return to wheel navigation"
+                                      ref={{current:null}}
+                                      onClick={function handleClick}
+                                      onBlur={function handleLeave}
+                                      onFocus={function}
+                                      onMouseEnter={function}
+                                      onMouseLeave={function handleLeave}
+                                      onTouchStart={function handleTouchStart}
+                                      href="/"
+                                      target={undefined}
+-                                     data-cursor-ref="e1"
+                                    >
+                                <_c variant="ghost" aria-label="Settings" data-tsd-source="/src/compo...">
+                                  <button
+                                    className={"inline-flex items-center justify-center gap-2 whitespace-nowrap round..."}
+                                    ref={null}
+                                    aria-label="Settings"
+                                    data-tsd-source="/src/components/finpilot-header.tsx:21:9"
+-                                   data-cursor-ref="e2"
+                                  >
+                                <_c variant="ghost" aria-label="Profile" data-tsd-source="/src/compo...">
+                                  <button
+                                    className={"inline-flex items-center justify-center gap-2 whitespace-nowrap round..."}
+                                    ref={null}
+                                    aria-label="Profile"
+                                    data-tsd-source="/src/components/finpilot-header.tsx:22:9"
+-                                   data-cursor-ref="e3"
+                                  >
+                          <main className="fifth-page..." data-tsd-source="/src/route...">
+                            <p
+                              className="mb-2 font-display text-sm font-bold uppercase tracking-[0.3em] text-primary"
+                              data-tsd-source="/src/routes/finance.tsx:45:9"
+-                             data-cursor-ref="e10"
+                            >
++                             03 — Finance
+                            <h1
+                              className="mb-6 font-display text-4xl font-extrabold leading-[0.95] md:text-6xl"
+                              data-tsd-source="/src/routes/finance.tsx:48:9"
+-                             data-cursor-ref="e11"
+                            >
++                             See the whole runway.
+                            <FinanceSection view="overview" onViewChange={function onViewChange} ...>
+                              <div className="flex min-h..." data-tsd-source="/src/compo...">
+                                <div className="flex flex-..." data-tsd-source="/src/compo...">
+                                  <div data-tsd-source="/src/compo...">
+                                    <p
+                                      className="text-sm text-muted-foreground"
+                                      data-tsd-source="/src/components/finance/finance-section.tsx:63:11"
+-                                     data-cursor-ref="e12"
+                                    >
++                                     Demo customer persona
+                                    ...
+                                      <Primitive.div data-radix-popper-side={undefined} ...>
+                                        <Primitive.div.Slot data-radix-popper-side={undefined} ...>
+                                          <Primitive.button type="button" role="combobox" aria-controls={undefined} ...>
+                                            <button
+                                              type="button"
+                                              role="combobox"
+                                              aria-controls={undefined}
+                                              aria-expanded={false}
+                                              aria-required={undefined}
+                                              aria-autocomplete="none"
+                                              dir="ltr"
+                                              data-state="closed"
+                                              disabled={false}
+                                              data-disabled={undefined}
+                                              data-placeholder={undefined}
+                                              className={"flex h-9 items-center justify-between whitespace-nowrap rou..."}
+                                              data-tsd-source="/src/components/finance/finance-section.tsx:65:13"
+                                              onClick={function handleEvent}
+                                              onPointerDown={function handleEvent}
+                                              onKeyDown={function handleEvent}
+                                              data-radix-popper-side={undefined}
+                                              data-radix-popper-align={undefined}
+                                              ref={function}
+-                                             data-cursor-ref="e4"
+                                            >
+                                  <p
+                                    className="max-w-md text-xs text-muted-foreground"
+                                    data-tsd-source="/src/components/finance/finance-section.tsx:77:9"
+-                                   data-cursor-ref="e13"
+                                  >
++                                   Live PNC demo data through the customer API. Educational numbers only — not advice.
+                                ...
+                                  <div role="tablist" aria-orientation="horizontal" className="inline-fle..." ...>
+                                    ...
+                                      <Primitive.span tabIndex={-1} data-orientation="horizontal" asChild={true} ...>
+                                        <Primitive.span.Slot tabIndex={-1} data-orientation="horizontal" ...>
+                                          <Primitive.button type="button" role="tab" aria-selected={true} ...>
+                                            <button
+                                              type="button"
+                                              role="tab"
+                                              aria-selected={true}
+                                              aria-controls="radix-_R_1eaq_-content-overview"
+                                              data-state="active"
+                                              data-disabled={undefined}
+                                              disabled={false}
+                                              id="radix-_R_1eaq_-trigger-overview"
+                                              className="inline-flex items-center justify-center whitespace-nowrap rou..."
+                                              data-tsd-source="/src/components/finance/finance-section.tsx:97:13"
+                                              onMouseDown={function}
+                                              onKeyDown={function}
+                                              onFocus={function}
+                                              tabIndex={-1}
+                                              data-orientation="horizontal"
+                                              data-radix-collection-item=""
+                                              ref={function}
+-                                             data-cursor-ref="e5"
+                                            >
+                                    ...
+                                      <Primitive.span tabIndex={-1} data-orientation="horizontal" asChild={true} ...>
+                                        <Primitive.span.Slot tabIndex={-1} data-orientation="horizontal" ...>
+                                          <Primitive.button type="button" role="tab" aria-selected={false} ...>
+                                            <button
+                                              type="button"
+                                              role="tab"
+                                              aria-selected={false}
+                                              aria-controls="radix-_R_1eaq_-content-cash"
+                                              data-state="inactive"
+                                              data-disabled={undefined}
+                                              disabled={false}
+                                              id="radix-_R_1eaq_-trigger-cash"
+                                              className="inline-flex items-center justify-center whitespace-nowrap rou..."
+                                              data-tsd-source="/src/components/finance/finance-section.tsx:97:13"
+                                              onMouseDown={function}
+                                              onKeyDown={function}
+                                              onFocus={function}
+                                              tabIndex={-1}
+                                              data-orientation="horizontal"
+                                              data-radix-collection-item=""
+                                              ref={function}
+-                                             data-cursor-ref="e6"
+                                            >
+                                    ...
+                                      <Primitive.span tabIndex={-1} data-orientation="horizontal" asChild={true} ...>
+                                        <Primitive.span.Slot tabIndex={-1} data-orientation="horizontal" ...>
+                                          <Primitive.button type="button" role="tab" aria-selected={false} ...>
+                                            <button
+                                              type="button"
+                                              role="tab"
+                                              aria-selected={false}
+                                              aria-controls="radix-_R_1eaq_-content-debt"
+                                              data-state="inactive"
+                                              data-disabled={undefined}
+                                              disabled={false}
+                                              id="radix-_R_1eaq_-trigger-debt"
+                                              className="inline-flex items-center justify-center whitespace-nowrap rou..."
+                                              data-tsd-source="/src/components/finance/finance-section.tsx:97:13"
+                                              onMouseDown={function}
+                                              onKeyDown={function}
+                                              onFocus={function}
+                                              tabIndex={-1}
+                                              data-orientation="horizontal"
+                                              data-radix-collection-item=""
+                                              ref={function}
+-                                             data-cursor-ref="e7"
+                                            >
+                                    ...
+                                      <Primitive.span tabIndex={-1} data-orientation="horizontal" asChild={true} ...>
+                                        <Primitive.span.Slot tabIndex={-1} data-orientation="horizontal" ...>
+                                          <Primitive.button type="button" role="tab" aria-selected={false} ...>
+                                            <button
+                                              type="button"
+                                              role="tab"
+                                              aria-selected={false}
+                                              aria-controls="radix-_R_1eaq_-content-goals"
+                                              data-state="inactive"
+                                              data-disabled={undefined}
+                                              disabled={false}
+                                              id="radix-_R_1eaq_-trigger-goals"
+                                              className="inline-flex items-center justify-center whitespace-nowrap rou..."
+                                              data-tsd-source="/src/components/finance/finance-section.tsx:97:13"
+                                              onMouseDown={function}
+                                              onKeyDown={function}
+                                              onFocus={function}
+                                              tabIndex={-1}
+                                              data-orientation="horizontal"
+                                              data-radix-collection-item=""
+                                              ref={function}
+-                                             data-cursor-ref="e8"
+                                            >
+                                    ...
+                                      <Primitive.span tabIndex={-1} data-orientation="horizontal" asChild={true} ...>
+                                        <Primitive.span.Slot tabIndex={-1} data-orientation="horizontal" ...>
+                                          <Primitive.button type="button" role="tab" aria-selected={false} ...>
+                                            <button
+                                              type="button"
+                                              role="tab"
+                                              aria-selected={false}
+                                              aria-controls="radix-_R_1eaq_-content-whatif"
+                                              data-state="inactive"
+                                              data-disabled={undefined}
+                                              disabled={false}
+                                              id="radix-_R_1eaq_-trigger-whatif"
+                                              className="inline-flex items-center justify-center whitespace-nowrap rou..."
+                                              data-tsd-source="/src/components/finance/finance-section.tsx:97:13"
+                                              onMouseDown={function}
+                                              onKeyDown={function}
+                                              onFocus={function}
+                                              tabIndex={-1}
+                                              data-orientation="horizontal"
+                                              data-radix-collection-item=""
+                                              ref={function}
+-                                             data-cursor-ref="e9"
+                                            >
+
+8:23:05 PM [vite] (client) [console.error] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <MatchInnerImpl match={{id:"__root__/", ...}}>
+      <RootComponent>
+        <QueryClientProvider client={{}} data-tsd-source="/src/route...">
+          <OutletImpl data-tsd-source="/src/route...">
+            <Suspense fallback={null}>
+              <MatchImpl routeId="/finance">
+                <MatchView router={{...}} match={{id:"/finan...", ...}}>
+                  <MatchInnerImpl match={{id:"/finan...", ...}}>
+                    <Lazy>
+                      <FinancePage>
+                        <div className="flex h-dvh..." data-tsd-source="/src/route...">
+                          <FinpilotHeader miniWheel={true} data-tsd-source="/src/route...">
+                            <header className="flex items..." data-tsd-source="/src/compo...">
+                              <_c asChild={true} variant="ghost" className="h-auto p-0..." ...>
+                                <Slot.Slot className={"inline-f..."} ref={null} data-tsd-source="/src/compo...">
+                                  <a
+                                    onClick={function handleClick}
+                                    data-tsd-source="/src/components/finpilot-header.tsx:9:9"
+                                    className={"inline-flex items-center justify-center gap-2 whitespace-nowrap round..."}
+                                    ref={{current:null}}
+                                    onBlur={function handleLeave}
+                                    onFocus={function}
+                                    onMouseEnter={function}
+                                    onMouseLeave={function handleLeave}
+                                    onTouchStart={function handleTouchStart}
+                                    href="/"
+                                    target={undefined}
+-                                   data-cursor-ref="e0"
+                                  >
+                              <nav className="flex items..." data-tsd-source="/src/compo...">
+                                <_c asChild={true} variant="ghost" size="icon" className="text-primary" ...>
+                                  <Slot.Slot className={"inline-f..."} ref={null} title="Return to ..." ...>
+                                    <a
+                                      data-tsd-source="/src/components/finpilot-header.tsx:18:13"
+                                      className={"inline-flex items-center justify-center gap-2 whitespace-nowrap rou..."}
+                                      title="Return to wheel navigation"
+                                      aria-label="Return to wheel navigation"
+                                      ref={{current:null}}
+                                      onClick={function handleClick}
+                                      onBlur={function handleLeave}
+                                      onFocus={function}
+                                      onMouseEnter={function}
+                                      onMouseLeave={function handleLeave}
+                                      onTouchStart={function handleTouchStart}
+                                      href="/"
+                                      target={undefined}
+-                                     data-cursor-ref="e1"
+                                    >
+                                <_c variant="ghost" aria-label="Settings" data-tsd-source="/src/compo...">
+                                  <button
+                                    className={"inline-flex items-center justify-center gap-2 whitespace-nowrap round..."}
+                                    ref={null}
+                                    aria-label="Settings"
+                                    data-tsd-source="/src/components/finpilot-header.tsx:21:9"
+-                                   data-cursor-ref="e2"
+                                  >
+                                <_c variant="ghost" aria-label="Profile" data-tsd-source="/src/compo...">
+                                  <button
+                                    className={"inline-flex items-center justify-center gap-2 whitespace-nowrap round..."}
+                                    ref={null}
+                                    aria-label="Profile"
+                                    data-tsd-source="/src/components/finpilot-header.tsx:22:9"
+-                                   data-cursor-ref="e3"
+                                  >
+                          <main className="fifth-page..." data-tsd-source="/src/route...">
+                            <div className="mb-2 flex ..." data-tsd-source="/src/route...">
+                              <p
+                                className="font-display text-sm font-bold uppercase tracking-[0.3em] text-primary"
+                                data-tsd-source="/src/routes/finance.tsx:54:11"
+-                               data-cursor-ref="e9"
+                              >
++                               Personal finance
+                            <h1
+                              className="font-display text-4xl font-extrabold leading-[0.95] md:text-6xl"
+                              data-tsd-source="/src/routes/finance.tsx:58:9"
+-                             data-cursor-ref="e10"
+                            >
++                             Make money make sense.
+                            <p
+                              className="mt-3 max-w-xl text-muted-foreground"
+                              data-tsd-source="/src/routes/finance.tsx:61:9"
+-                             data-cursor-ref="e11"
+                            >
++                             A complete view of your money, backed by transparent calculations.
+                            <div className="mt-8 min-h..." data-tsd-source="/src/route...">
+                              <FinanceSection view="money" onViewChange={function onViewChange} ...>
+                                <div className="flex min-h..." data-tsd-source="/src/compo...">
+                                  <div className="mb-8 flex ..." data-tsd-source="/src/compo...">
+                                    <nav
+                                      className="flex flex-wrap gap-6"
+                                      aria-label="Finance sections"
+                                      data-tsd-source="/src/components/finance/finance-section.tsx:67:9"
+-                                     data-cursor-ref="e12"
+                                    >
+                                      <button
+                                        type="button"
+                                        onClick={function onClick}
+                                        className="font-display text-sm font-bold tracking-wide transition-colors text..."
+                                        data-tsd-source="/src/components/finance/finance-section.tsx:69:13"
+-                                       data-cursor-ref="e4"
+                                      >
+                                      <button
+                                        type="button"
+                                        onClick={function onClick}
+                                        className="font-display text-sm font-bold tracking-wide transition-colors text..."
+                                        data-tsd-source="/src/components/finance/finance-section.tsx:69:13"
+-                                       data-cursor-ref="e5"
+                                      >
+                                      <button
+                                        type="button"
+                                        onClick={function onClick}
+                                        className="font-display text-sm font-bold tracking-wide transition-colors text..."
+                                        data-tsd-source="/src/components/finance/finance-section.tsx:69:13"
+-                                       data-cursor-ref="e6"
+                                      >
+                                      <button
+                                        type="button"
+                                        onClick={function onClick}
+                                        className="font-display text-sm font-bold tracking-wide transition-colors text..."
+                                        data-tsd-source="/src/components/finance/finance-section.tsx:69:13"
+-                                       data-cursor-ref="e7"
+                                      >
+                                    ...
+                                      <Primitive.div data-radix-popper-side={undefined} ...>
+                                        <Primitive.div.Slot data-radix-popper-side={undefined} ...>
+                                          <Primitive.button type="button" role="combobox" aria-controls={undefined} ...>
+                                            <button
+                                              type="button"
+                                              role="combobox"
+                                              aria-controls={undefined}
+                                              aria-expanded={false}
+                                              aria-required={undefined}
+                                              aria-autocomplete="none"
+                                              dir="ltr"
+                                              data-state="closed"
+                                              disabled={false}
+                                              data-disabled={undefined}
+                                              data-placeholder={undefined}
+                                              className={"flex items-center justify-between whitespace-nowrap rounded..."}
+                                              data-tsd-source="/src/components/finance/finance-section.tsx:88:13"
+                                              onClick={function handleEvent}
+                                              onPointerDown={function handleEvent}
+                                              onKeyDown={function handleEvent}
+                                              data-radix-popper-side={undefined}
+                                              data-radix-popper-align={undefined}
+                                              ref={function}
+-                                             data-cursor-ref="e8"
+                                            >
+                                  ...
+

@@ -1,0 +1,54 @@
+# FinPilot PNC backend.
+#
+# Default: the API runs against TigerData (Timescale Cloud). Put DATABASE_URL in backend/.env (never commit it).
+#   docker compose up --build api
+#
+# `local-db` profile: a throwaway TimescaleDB for offline development / CI-style runs.
+#   docker compose --profile local-db up --build
+# NOTE: the local profile creates its own roles via the migrations; it has not been used for the verified results in Skill.md,
+# which were obtained against the TigerData service.
+services:
+  api:
+    build: ./backend
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+
+  migrate:
+    build: ./backend
+    profiles: ["tools"]
+    env_file:
+      - path: ./backend/.env
+        required: false
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+
+  redis:
+    image: redis:7-alpine
+    profiles: ["queue"]
+    ports:
+      - "6379:6379"
+
+  worker:
+    build: ./backend
+    profiles: ["queue"]
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    command: ["python", "-m", "celery", "-A", "app.pnc.celery_app", "worker", "--loglevel=INFO"]
+    depends_on: [redis]
+
+  local-db:
+    image: timescale/timescaledb:latest-pg16
+    profiles: ["local-db"]
+    environment:
+      POSTGRES_PASSWORD: local-dev-only
+      POSTGRES_DB: tsdb
+    ports:
+      - "5433:5432"
