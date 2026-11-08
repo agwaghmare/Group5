@@ -1,8 +1,7 @@
 """Reproducible demo fixtures, separate from your partner's existing datasets."""
-from datetime import date
-from random import Random
 import os
-from datetime import datetime
+from datetime import date, datetime
+from random import Random
 from zoneinfo import ZoneInfo
 
 from app.staff.registry import ROLES

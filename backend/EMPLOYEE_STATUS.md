@@ -1,5 +1,10 @@
 # Employee implementation status
 
+**Storage update:** the active backend now uses SQLAlchemy + local SQLite with
+email-based users and a shared role directory. Tiger and Lab Package integrations
+are retired for the active app. See SQLALCHEMY_SETUP.md for current verification;
+the earlier cloud-specific notes below describe the superseded implementation.
+
 Backend-only implementation against the current PNC scope in Skill.md. Frontend
 implementation remains with the teammate. This is not a completed production system.
 

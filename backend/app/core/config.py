@@ -1,15 +1,12 @@
 """Environment-based configuration.
 
-The database URL comes from `DATABASE_URL`. For local development only, if it is
-unset and `TIGER_SERVICE_ID` is set, the URL is obtained from the Tiger CLI
-(`tiger db uri <id> --with-password`). Secrets are never written to disk or logs.
+The active ORM uses DATABASE_URL, defaulting to local SQLite.
+Cloud discovery is disabled; secrets are never written to logs.
 """
 
 from __future__ import annotations
 
 import os
-import shutil
-import subprocess
 from functools import lru_cache
 from pathlib import Path
 
@@ -27,7 +24,7 @@ class Settings(BaseSettings):
 
     app_env: str = Field(default="dev", description="dev | test | prod")
     database_url: str | None = None
-    tiger_service_id: str | None = "ernvuaxenn"
+    tiger_service_id: str | None = None  # legacy configuration; never auto-connect
     db_schema: str = "finpilot"
     db_pool_size: int = 5
     db_max_overflow: int = 5
@@ -64,45 +61,23 @@ def validate_production_settings(settings: Settings | None = None) -> None:
     if s.jwt_secret == DEFAULT_JWT_SECRET or len(s.jwt_secret) < 32:
         problems.append("JWT_SECRET must be set to a random value of at least 32 characters")
     if not (s.database_url or os.getenv("DATABASE_URL")):
-        problems.append("DATABASE_URL must be set explicitly (the tiger CLI fallback is development-only)")
+        problems.append("DATABASE_URL must be set explicitly")
     if problems:
         raise RuntimeError("unsafe production configuration: " + "; ".join(problems))
 
 
-def _tiger_executable() -> str | None:
-    found = shutil.which("tiger")
-    if found:
-        return found
-    local = Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "TigerCLI" / "tiger.exe"
-    return str(local) if local.exists() else None
-
-
 @lru_cache(maxsize=1)
 def get_database_url() -> str:
-    """Return a SQLAlchemy psycopg3 URL. Raises a clear error if none can be found."""
-    settings = get_settings()
-    url = settings.database_url or os.environ.get("DATABASE_URL")
-    if not url and settings.tiger_service_id:
-        exe = _tiger_executable()
-        if exe:
-            result = subprocess.run(
-                [exe, "db", "uri", settings.tiger_service_id, "--with-password"],
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-            lines = (result.stdout or "").strip().splitlines()
-            if result.returncode == 0 and lines and lines[-1].startswith("postgres"):
-                url = lines[-1].strip()
+    """Local SQLAlchemy default; no cloud discovery or Tiger CLI calls."""
+    url = get_settings().database_url or os.environ.get("DATABASE_URL")
     if not url:
-        raise RuntimeError(
-            "No database URL. Set DATABASE_URL (postgresql://user:pass@host:port/db?sslmode=require) "
-            "or install the Tiger CLI and set TIGER_SERVICE_ID."
-        )
+        return "sqlite:///" + str(BACKEND_DIR / "storage" / "finpilot_local.sqlite3")
     if url.startswith("postgresql://"):
-        url = "postgresql+psycopg://" + url[len("postgresql://"):]
-    elif url.startswith("postgres://"):
-        url = "postgresql+psycopg://" + url[len("postgres://"):]
+        return "postgresql+psycopg://" + url[len("postgresql://"):]
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://"):]
+    if url.startswith("sqlite:///") and not url.startswith("sqlite:////") and url != "sqlite:///:memory:":
+        return "sqlite:///" + str(BACKEND_DIR / url[len("sqlite:///"):])
     return url
 
 

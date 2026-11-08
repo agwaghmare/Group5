@@ -6,13 +6,13 @@ import logging
 
 import pytest
 
-from app.core.config import Settings, validate_production_settings
+from app.core.config import DEFAULT_JWT_SECRET, Settings, validate_production_settings
 from app.core.logging import JsonFormatter
 
 
 def test_prod_rejects_default_secret():
     with pytest.raises(RuntimeError, match="JWT_SECRET"):
-        validate_production_settings(Settings(app_env="prod", database_url="postgresql://x"))
+        validate_production_settings(Settings(app_env="prod", database_url="postgresql://x", jwt_secret=DEFAULT_JWT_SECRET))
 
 
 def test_prod_rejects_missing_database_url(monkeypatch):

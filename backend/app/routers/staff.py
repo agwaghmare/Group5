@@ -1,16 +1,13 @@
 """Employee API. See /docs and backend/EMPLOYEE_API.md for frontend integration."""
-import csv
-import json
 import os
-import secrets
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.settings import BACKEND
+from app.orm.identity import current_identity, find_user, issue_session, public_user
 from app.staff.policy import ALLOWED, OUTCOMES, evaluate
 from app.staff.registry import BANNER, FEATURES, ROLES, capabilities, visible
 from app.staff.seed import business_date, tenure_months
@@ -91,19 +88,13 @@ def fail(store, message, resource="", status=403):
 
 
 def demo_enabled():
-    if os.environ.get("STAFF_DEMO_ENABLED", "false").lower() != "true":
+    if os.environ.get("APP_ENV", "dev") == "prod" or os.environ.get("STAFF_DEMO_ENABLED", "false").lower() != "true":
         raise HTTPException(404, "Demo persona login is disabled")
 
 
-def session(authorization: str | None = Header(default=None), store=Depends(database)):
-    token = authorization.removeprefix("Bearer ") if authorization and authorization.startswith("Bearer ") else ""
-    row = store.get("sessions", digest(token)) if token else None
-    if not row or row["expires_at"] <= now():
-        fail(store, "Missing, expired, or revoked staff session", status=401)
-    employee = store.get("employees", row["employee_id"])
-    if not employee or employee["status"] != "active":
-        fail(store, "Inactive employee", status=401)
-    store.assume(employee)
+def session(store=Depends(current_identity)):
+    if store.user.role_key == "customer":
+        fail(store, "Employee access is not available for your role", "staff")
     return store
 
 
@@ -134,7 +125,7 @@ def grant_for(store, grant_id, prospect_id=None):
 def public_prospect(row):
     # Notes, name, age, location and protected labels never enter analyst payloads.
     return {key: value for key, value in row.items() if key in ALLOWED or key in
-            ("id", "application_ref", "assigned_to", "synthetic", "as_of")}
+            ("id", "application_ref", "assigned_to", "synthetic", "as_of", "employment_months", "delinquencies_12m", "bankruptcy_years_ago")}
 
 
 def run_for(store, key):
@@ -183,14 +174,13 @@ def login(body: Login, store=Depends(database)):
     employee = store.get("employees", body.employee_id)
     if not employee or employee["status"] != "active":
         fail(store, "Unknown demo persona", body.employee_id, 404)
-    token = secrets.token_urlsafe(32)
-    expires = (datetime.now(timezone.utc) + timedelta(hours=int(os.environ.get("STAFF_SESSION_HOURS", "8")))).isoformat()
-    store.insert("sessions", {"id": digest(token), "employee_id": employee["id"], "expires_at": expires})
-    store.assume(employee)
-    store.audit("demo_login", employee["id"])
-    return {"token": token, "token_type": "bearer", "expires_at": expires,
-            "employee": employee, "synthetic_demo": True, "tabs": visible(employee["role"]),
-            "features": capabilities(employee["role"]), "banner": BANNER}
+    user = find_user(store, employee["id"])
+    if not user or not user.active:
+        fail(store, "Inactive user", employee["id"], 401)
+    issued = issue_session(store, user)
+    return {**issued, "employee": employee, "tabs": visible(user.role_key),
+            "features": capabilities(user.role_key), "banner": BANNER}
+
 
 
 @router.delete("/session", status_code=204)
@@ -206,7 +196,7 @@ def me(store=Depends(session)):
     store.audit("session_profile_read")
     return {"employee": store.employee, "tabs": visible(store.employee["role"]),
             "features": capabilities(store.employee["role"]), "banner": BANNER,
-            "storage": "postgresql_rls" if store.postgres else "sqlite_api_isolation_only",
+            "storage": "sqlalchemy_sqlite", "user": public_user(store.user),
             "agent_provider": "mock", "synthetic_demo": True}
 
 
@@ -245,13 +235,7 @@ def prospect_queue(store=Depends(session)):
 @router.post("/access-grants", status_code=201)
 def access_grant(body: Grant, store=Depends(session)):
     allow(store, "staff.creditresearch")
-    if store.postgres:
-        prospect = store.conn.execute("SELECT staff_app.grant_metadata(%s,%s)",
-            (body.prospect_id, body.break_glass_reason or "")).fetchone()[0]
-        if not prospect:
-            fail(store, "Outside assignment or unknown prospect", body.prospect_id)
-    else:
-        prospect = assigned(store, "prospects", body.prospect_id)
+    prospect = assigned(store, "prospects", body.prospect_id)
     conflict = any(r["employee_id"] == store.employee["id"] and r["prospect_id"] == prospect["id"] for r in store.all("links"))
     if conflict:
         fail(store, "Conflict of interest: another analyst must handle this prospect", prospect["id"])
@@ -442,9 +426,6 @@ def new_benefit_rules(body: BenefitRules, store=Depends(session)):
     benefits_admin(store)
     if any(r < 0 or r > 100 for r in body.rates):
         raise HTTPException(422, "Rates must be between zero and 100")
-    # Serialize admin rule/catalog version allocation in PostgreSQL.
-    if store.postgres:
-        store.conn.execute("SELECT pg_advisory_xact_lock(706311)")
     version = benefit_rules(store)["version"] + 1
     row = {"id": f"benefits-v{version}", "version": version,
            "tiers": [{"min_months": months, "rate": rate} for months, rate in zip([0, 12, 60], body.rates)],
@@ -458,8 +439,6 @@ def new_benefit_rules(body: BenefitRules, store=Depends(session)):
 @router.post("/benefits/admin/catalog", status_code=201)
 def new_catalog_item(body: Item, store=Depends(session)):
     benefits_admin(store)
-    if store.postgres:
-        store.conn.execute("SELECT pg_advisory_xact_lock(706311)")
     prior = [r for r in store.all("catalog") if r["item_key"] == body.item_key]
     version = max((r["version"] for r in prior), default=0)+1
     row = {**body.model_dump(), "id": f"{body.item_key}-v{version}", "version": version, "synthetic": True}
@@ -481,8 +460,6 @@ def audit(action: str | None = None, outcome: str | None = None, actor: str | No
 
 
 def aggregate_research(store):
-    if store.postgres:
-        return store.conn.execute("SELECT staff_app.research_metrics()").fetchone()[0]
     runs, decisions = store.all("runs"), store.all("decisions")
     counts = {outcome: sum(r["outcome"] == outcome for r in runs) for outcome in OUTCOMES}
     return {"group_size": len(runs), "outcomes": {k: v if v >= 5 else None for k, v in counts.items()},
@@ -500,21 +477,21 @@ def portfolio(store=Depends(session)):
         return {"scope": "campaign_results_only", "campaign_count": len(rows) if len(rows) >= 5 else None,
                 "suppression_threshold": 5, "suppression_notice": "Groups smaller than five are suppressed.",
                 "sends": "simulated"}
-    # Explicit local source. Never imply this is reading the shared Tiger dataset.
-    latest = {}
-    path = BACKEND.parent / "data" / "personal_finance_tracker_dataset.csv"
-    if path.exists():
-        with path.open() as handle:
-            for row in csv.DictReader(handle):
-                if row["user_id"] not in latest or row["date"] > latest[row["user_id"]]["date"]:
-                    latest[row["user_id"]] = row
-    n = len(latest)
-    metrics = {key: round(sum(float(r[key]) for r in latest.values())/n, 2) if n >= 5 else None
+    from sqlalchemy import func, select
+    from app.orm.models import FinanceSnapshot
+    latest = select(FinanceSnapshot.user_id, func.max(FinanceSnapshot.date).label("latest_date")).group_by(FinanceSnapshot.user_id).subquery()
+    query = select(FinanceSnapshot).join(latest, (FinanceSnapshot.user_id == latest.c.user_id) & (FinanceSnapshot.date == latest.c.latest_date))
+    rows = list(store.db.scalars(query))
+    n = len(rows)
+    metrics = {key: round(sum(float(getattr(r, key)) for r in rows if getattr(r, key) is not None) /
+                         sum(getattr(r, key) is not None for r in rows), 2)
+               if sum(getattr(r, key) is not None for r in rows) >= 5 else None
                for key in ("monthly_income", "total_debt_balance", "emergency_fund_months")}
     return {"customer_count": n if n >= 5 else None, "mean_metrics": metrics,
-            "source": "local synthetic personal_finance_tracker_dataset.csv; latest snapshot per customer",
-            "data_as_of": max((r["date"] for r in latest.values()), default=None),
+            "source": "SQLAlchemy finance_snapshots, imported from personal_finance_tracker_dataset.csv",
+            "data_as_of": max((r.date.isoformat() for r in rows), default=None),
             "research": aggregate_research(store), "synthetic": True}
+
 
 
 @router.get("/compliance/reviews")
@@ -531,20 +508,17 @@ def reviews(store=Depends(session)):
 def fairness(store=Depends(session)):
     allow(store, "staff.fairness")
     store.audit("fairness_metrics_read")
-    if store.postgres:
-        measured = store.conn.execute("SELECT staff_app.fairness_metrics()").fetchone()[0]
-    else:
-        labels = {r["id"]: r["group_label"] for r in store.all("protected")}
-        latest = {}
-        for run in sorted(store.all("runs"), key=lambda r: r["run_at"]):
-            latest[run["prospect_id"]] = run
-        groups = {}
-        for pid, run in latest.items():
-            group = labels.get(pid)
-            if group is not None:
-                groups.setdefault(group, []).append(run["outcome"] == "MEETS_POLICY")
-        measured = {label: {"n": len(values), "meets_policy_rate": sum(values)/len(values)}
-                    for label, values in groups.items()}
+    labels = {r["id"]: r["group_label"] for r in store.all("protected")}
+    latest = {}
+    for run in sorted(store.all("runs"), key=lambda r: r["run_at"]):
+        latest[run["prospect_id"]] = run
+    groups = {}
+    for pid, run in latest.items():
+        group = labels.get(pid)
+        if group is not None:
+            groups.setdefault(group, []).append(run["outcome"] == "MEETS_POLICY")
+    measured = {label: {"n": len(values), "meets_policy_rate": sum(values)/len(values)}
+                for label, values in groups.items()}
     reference = measured.get("A", {}).get("meets_policy_rate", 0)
     metrics = []
     for label, value in measured.items():

@@ -344,9 +344,10 @@ def explain(
     customer_id: str | None,
     tracker_user_id: int | None,
     go_deeper: bool = False,
+    context: DecisionContext | None = None,
 ) -> dict:
     question = match_question(text, question_id)
-    ctx = load_context(customer_id, tracker_user_id)
+    ctx = context or load_context(customer_id, tracker_user_id)
     if question is None:
         return {
             "matched": False,

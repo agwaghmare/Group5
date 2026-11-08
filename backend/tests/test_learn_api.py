@@ -133,15 +133,17 @@ def test_scenario_grade():
 
 
 def test_tracker_apy_and_all_questions_render():
+    token = client.post("/api/v1/auth/dev-login", json={"persona_id": "1000"}).json()["access_token"]
+    headers = {"Authorization": "Bearer " + token}
     body = client.post(
         "/learn/agent",
-        json={"question": "Explain APY", "tracker_user_id": 1000},
+        json={"question": "Explain APY", "tracker_user_id": 1000}, headers=headers,
     ).json()
     assert body["matched"] is True
     assert body["question_id"] == "explain-apy"
     assert "annual percentage yield" in body["explanation"]["one_sentence"].lower()
     for question_id in QUESTION_INDEX:
-        result = client.post("/learn/context/explain", json={"question_id": question_id, "tracker_user_id": 1000, "go_deeper": True})
+        result = client.post("/learn/context/explain", json={"question_id": question_id, "tracker_user_id": 1000, "go_deeper": True}, headers=headers)
         assert result.status_code == 200
         explanation = result.json()["explanation"]
         assert explanation["one_sentence"].strip()

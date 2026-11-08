@@ -8,12 +8,11 @@ import os
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from app.staff.registry import ROLES
 from app.staff.seed import employees
 from app.staff.store import ident
 
 
-@unittest.skipUnless(os.environ.get('STAFF_TEST_DATABASE_URL'), 'No dedicated PostgreSQL test connection configured')
+@unittest.skipUnless(os.environ.get('RUN_LEGACY_TIGER_TESTS') == '1' and os.environ.get('STAFF_TEST_DATABASE_URL'), 'Archived Tiger tests; inactive in SQLAlchemy local mode')
 class PostgreSQLIsolation(unittest.TestCase):
     def setUp(self):
         import psycopg
