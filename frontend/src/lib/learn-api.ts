@@ -1,5 +1,6 @@
 // Typed client for the Learn backend (backend/app/routers/learn.py).
 // In dev, Vite proxies /api/* to FastAPI; in production set VITE_LEARN_API_URL.
+import { readCustomerSession } from "@/lib/customer-session";
 
 const BASE =
   (import.meta.env["VITE_LEARN_API_URL"] as string | undefined) ?? "/api";
@@ -147,6 +148,12 @@ export interface ExplainResult {
   };
   notes: string[];
   prompts?: Prompt[];
+  wilbur?: {
+    agent: "Wilbur";
+    answer: string;
+    reasons: string[];
+    limitations: string[];
+  };
 }
 
 export interface Scenario {
@@ -159,9 +166,13 @@ export interface Scenario {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const session = readCustomerSession();
+  const headers = new Headers(init?.headers);
+  headers.set("Content-Type", "application/json");
+  if (session?.token) headers.set("Authorization", `Bearer ${session.token}`);
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
     ...init,
+    headers,
   });
   if (!res.ok) {
     let detail = res.statusText;
@@ -239,7 +250,7 @@ export const learnApi = {
     lesson_id?: string | undefined;
     go_deeper?: boolean | undefined;
   }) =>
-    request<ExplainResult>("/learn/context/explain", {
+    request<ExplainResult>(readCustomerSession()?.token && !body.go_deeper ? "/learn/wilbur" : "/learn/context/explain", {
       method: "POST",
       body: JSON.stringify(body),
     }),

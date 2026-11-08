@@ -1,13 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useCustomerSession } from "@/lib/customer-session";
+import { WilburReply } from "@/components/learn/wilbur-reply";
 import { Badge } from "@/components/ui/badge";
 import { ExplanationCard } from "@/components/learn/explanation-card";
 import { learnApi, learnUserId, type ExplainResult } from "@/lib/learn-api";
 
 /**
- * "Learn from the current decision": pick a finance tracker user
+ * "Learn from the current decision": use the signed-in customer's tracker
  * and click a question such as "Explain APY" or "What is credit utilization?".
  * Numbers come from the synthetic tracker; nothing here is an offer.
  */
@@ -16,46 +18,51 @@ export function ExplainThis({
 }: {
   onOpenLesson: (lessonId: string) => void;
 }) {
-  const [trackerId, setTrackerId] = useState("1000");
-  const [applied, setApplied] = useState<{
-    tracker: number | undefined;
-  }>({
-    tracker: 1000,
-  });
+  const session = useCustomerSession();
+  const [usePersonal, setUsePersonal] = useState(true);
+  const [question, setQuestion] = useState("");
+  const trackerId = session?.customerId && !session.isStaff ? Number(session.customerId) : undefined;
+  const personalAvailable = Boolean(session?.token && trackerId !== undefined && Number.isInteger(trackerId));
+  const appliedTracker = usePersonal && personalAvailable ? trackerId : undefined;
+  const requestId = useRef(0);
   const [result, setResult] = useState<ExplainResult | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const prompts = useQuery({
-    queryKey: ["learn", "prompts", applied.tracker],
-    queryFn: () => learnApi.prompts(undefined, applied.tracker),
+    queryKey: ["learn", "prompts", session?.email, session?.token, appliedTracker],
+    queryFn: () => learnApi.prompts(undefined, appliedTracker),
+    retry: false,
   });
 
-  const ask = async (questionId: string) => {
-    setBusy(questionId);
+  useEffect(() => {
+    requestId.current += 1;
+    setResult(null);
+    setError(null);
+    setBusy(null);
+  }, [session?.token, appliedTracker]);
+
+  const ask = async (questionId?: string, text?: string) => {
+    if (busy !== null) return;
+    const currentRequest = ++requestId.current;
+    setBusy(questionId ?? "custom");
+    setResult(null);
     setError(null);
     try {
-      setResult(
-        await learnApi.explain({
+      const response = await learnApi.explain({
           question_id: questionId,
-          tracker_user_id: applied.tracker,
+          question: text,
+          tracker_user_id: appliedTracker,
           user_id: learnUserId(),
-        }),
-      );
+        });
+      if (currentRequest === requestId.current) setResult(response);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not explain");
+      if (currentRequest === requestId.current) setError(e instanceof Error ? e.message : "Could not explain");
     } finally {
-      setBusy(null);
+      if (currentRequest === requestId.current) setBusy(null);
     }
   };
 
-  const apply = () => {
-    const tracker = trackerId.trim() ? Number(trackerId) : undefined;
-    setApplied({
-      tracker: Number.isFinite(tracker) ? tracker : undefined,
-    });
-    setResult(null);
-  };
 
   return (
     <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
@@ -64,22 +71,21 @@ export function ExplainThis({
           <p className="mb-3 font-display text-xs font-bold uppercase tracking-[0.3em] text-primary">
             Whose numbers?
           </p>
-          <label
-            className="mb-1 block text-xs text-muted-foreground"
-            htmlFor="learn-tracker"
-          >
-            Finance tracker user (1000–1499)
-          </label>
-          <Input
-            id="learn-tracker"
-            value={trackerId}
-            onChange={(e) => setTrackerId(e.target.value)}
-            placeholder="1000"
-            inputMode="numeric"
-          />
-          <Button className="mt-3 w-full" variant="secondary" onClick={apply}>
-            Use these numbers
-          </Button>
+          <p className="text-sm text-muted-foreground">
+            {appliedTracker !== undefined
+              ? `Your signed-in finance tracker (${appliedTracker}). Wilbur explains your own synthetic numbers.`
+              : "Sample lesson numbers. Sign in to a customer account to use your own tracker."}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant={usePersonal && personalAvailable ? "default" : "outline"}
+              disabled={!personalAvailable || busy !== null} onClick={() => setUsePersonal(true)}>
+              Use my numbers
+            </Button>
+            <Button variant={!usePersonal || !personalAvailable ? "default" : "outline"}
+              disabled={busy !== null} onClick={() => setUsePersonal(false)}>
+              Use sample numbers
+            </Button>
+          </div>
           {prompts.data?.notes.map((n) => (
             <p key={n} className="mt-3 text-xs text-muted-foreground">
               {n}
@@ -116,11 +122,22 @@ export function ExplainThis({
       </aside>
 
       <div>
+        <form className="mb-5 space-y-3 rounded-2xl border border-border p-4" onSubmit={(event) => {
+          event.preventDefault();
+          if (question.trim()) void ask(undefined, question.trim());
+        }}>
+          <label htmlFor="wilbur-question" className="font-display font-bold">Ask Wilbur</label>
+          <Input id="wilbur-question" value={question} onChange={(event) => setQuestion(event.target.value)}
+            placeholder="Explain annual percentage yield in plain words" disabled={busy !== null} />
+          <Button type="submit" disabled={busy !== null || !question.trim()}>
+            {busy === "custom" ? "Wilbur is thinking..." : "Ask Wilbur"}
+          </Button>
+        </form>
         {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
         {!result && !error && (
           <div className="flex h-full min-h-[280px] items-center justify-center rounded-2xl border border-dashed border-border p-8 text-center text-muted-foreground">
-            Pick a question on the left. The answer uses that user's
-            synthetic tracker data, in plain words first.
+            Ask Wilbur or pick a question on the left. Start with a plain-word
+            explanation, then explore the worked example.
           </div>
         )}
         {result && (
@@ -139,13 +156,15 @@ export function ExplainThis({
                 </Button>
               )}
             </div>
+            <WilburReply reply={result.wilbur} />
             <ExplanationCard
               key={result.question_id ?? "unmatched"}
               explanation={result.explanation}
               onGoDeeper={async () => {
                 const deep = await learnApi.explain({
                   question_id: result.question_id,
-                  tracker_user_id: applied.tracker,
+                  question: result.question_id ? undefined : question,
+                  tracker_user_id: appliedTracker,
                   go_deeper: true,
                 });
                 return deep.explanation.go_deeper;

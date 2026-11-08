@@ -3,6 +3,7 @@ import { ArrowUp, Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ExplanationCard } from "@/components/learn/explanation-card";
+import { WilburReply } from "@/components/learn/wilbur-reply";
 import { learnApi, learnUserId, type ExplainResult } from "@/lib/learn-api";
 
 type SpeechRec = {
@@ -108,7 +109,7 @@ export function LessonAsk({
     <section className="space-y-4 rounded-2xl border border-border bg-card/40 p-5">
       <div>
         <p className="font-display text-xs font-bold uppercase tracking-[0.3em] text-primary">
-          Ask about this lesson
+          Ask Wilbur about this lesson
         </p>
         <h2 className="mt-2 font-display text-2xl font-extrabold">A little clarity. Just ask.</h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -193,6 +194,7 @@ export function LessonAsk({
               </Button>
             )}
           </div>
+          <WilburReply reply={result.wilbur} />
           <ExplanationCard
             key={result.question_id ?? result.label ?? "ask"}
             explanation={result.explanation}

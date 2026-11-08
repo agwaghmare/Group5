@@ -340,6 +340,45 @@ def learning_agent(body: ExplainRequest, authorization: str | None = Header(defa
     return context_explain(body, authorization)
 
 
+@router.post("/wilbur")
+def wilbur_explain(body: ExplainRequest, authorization: str | None = Header(default=None)) -> dict:
+    """Wilbur explains the authorized curriculum and code-computed examples."""
+    from app.agents.bessie import AgentError, explain as agent_explain
+
+    with Store() as store:
+        current_identity(authorization, store)
+        user_id, role = store.user.id, store.user.role_key
+        grants = store.user.role.features or []
+        if "learn.*" not in grants and "learn.explain" not in grants:
+            raise HTTPException(403, "Learning explanations are not available for your role")
+    # This path retains the same ownership checks and deterministic example math.
+    result = context_explain(body, authorization)
+    explanation = result["explanation"]
+    evidence = {
+        "lesson": result.get("lesson_title"),
+        "curriculum": {key: explanation[key] for key in (
+            "one_sentence", "analogy", "worked_example", "what_this_means_for_you", "safe_next_step")},
+        "recorded_numbers": result.get("your_numbers", {}).get("tracker", {}),
+    }
+    try:
+        reply = agent_explain(body.question or result.get("label") or "Explain this lesson in plain words.",
+                              role, "learn.explain", evidence, agent="wilbur")
+    except AgentError as exc:
+        raise HTTPException(exc.status, exc.message.replace("Bessie", "Wilbur")) from None
+    # Recheck the session after the provider call, before returning personal data.
+    with Store() as store:
+        current_identity(authorization, store)
+        grants = store.user.role.features or []
+        if store.user.id != user_id or store.user.role_key != role or not (
+            "learn.*" in grants or "learn.explain" in grants
+        ):
+            raise HTTPException(403, "Your learning permissions changed. Please try again.")
+        if body.customer_id is not None or body.tracker_user_id is not None:
+            customer_scope(store, body.tracker_user_id if body.tracker_user_id is not None else body.customer_id)
+        store.audit("wilbur_explanation", body.lesson_id or result.get("lesson_id") or "learn")
+    return {**result, "wilbur": reply}
+
+
 def authorized_context(customer_id, tracker_user_id, authorization):
     if customer_id is None and tracker_user_id is None:
         return load_context()
