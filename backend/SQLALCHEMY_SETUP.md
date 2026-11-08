@@ -1,5 +1,8 @@
 # Local SQLAlchemy schema and role views
 
+**Portfolio workspace:** see [PORTFOLIO_SETUP.md](PORTFOLIO_SETUP.md) for assigned clients, risk assessments and approved simulated rebalancing.
+
+
 **Current account/AI setup:** see [BESSIE_SETUP.md](BESSIE_SETUP.md). Normal sign-in now requires a provisioned email/password account. Demo login and auto-seeding are disabled; old sample logins below are historical. Bessie uses NVIDIA_API_KEY directly, without AGENT_PROVIDER. Existing financial data remains synthetic.
 
 The active app uses **SQLAlchemy 2 ORM + local SQLite**. SQLAlchemy is the model
@@ -117,7 +120,7 @@ workspace and scoped data. It supplies backend data, not rendered frontend HTML.
 | credit_analyst | Assigned prospect queue; credit fields require purpose grant | home, research, benefits, activity |
 | service_specialist | Assigned cases and consented context | home, cases, benefits, learn |
 | marketing_analyst | Campaign results; audience empty without verified consent data | home, portfolio, benefits, learn |
-| portfolio_manager | Tracker/research aggregates; groups below five suppressed | home, portfolio, benefits, learn |
+| portfolio_manager | Assigned-client portfolios and own portfolio activity; aggregates suppress groups below five | home, portfolio, benefits, activity |
 | compliance_analyst | Overrides, masked research evidence; audit/fairness endpoints | home, compliance, benefits, learn |
 | auditor | Read-only audit events | home, compliance, benefits, learn |
 | benefits_admin | Benefits ledgers/catalog/rules only | home, benefits, learn |

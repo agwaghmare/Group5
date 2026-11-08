@@ -89,7 +89,7 @@ session. It can be reintroduced later with server verification and account mappi
 
 ## Bessie's prompt and request
 
-Prompt: `app/agents/prompts/bessie.md`, version bessie-v3.
+Prompt: `app/agents/prompts/bessie.md`, version bessie-v5.
 Adapter: `app/agents/bessie.py`. The existing `/staff/assistant` endpoint is live.
 Requests default to `agent: "bessie"`; Bessie keeps her identity on every tab.
 The explicit staff Explain This panel uses `agent: "wilbur"` with `learn.explain`
@@ -201,3 +201,8 @@ money rendering, bounded regeneration and refusal to return repeated invalid dra
 Final validation-fix checks: 93 backend tests passed, 195 archived tests skipped;
 backend lint passed. The final live synthetic research reply passed validation
 and included a server-rendered evidence citation.
+
+Portfolio extension: Bessie receives the selected assigned client assessment and
+pending proposal through the existing NVIDIA adapter. She explains risk capacity,
+stated tolerance, current exposure and modeled returns; assignment and simulated
+rebalance approval remain human API actions. See [PORTFOLIO_SETUP.md](PORTFOLIO_SETUP.md).

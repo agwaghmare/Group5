@@ -22,6 +22,7 @@ from app.core.config import get_settings, validate_production_settings
 from app.core.logging import configure_logging
 from app.routers.identity import router as auth_router
 from app.routers.learn import router as learn_router
+from app.routers.portfolio import router as portfolio_router
 from app.routers.staff import router as staff_router
 from app.routers.tracker import router as customer_router
 from app.routers.views import router as views_router
@@ -77,6 +78,7 @@ app.include_router(auth_router)
 app.include_router(customer_router)
 app.include_router(learn_router)
 app.include_router(staff_router)
+app.include_router(portfolio_router)
 app.include_router(views_router)
 
 

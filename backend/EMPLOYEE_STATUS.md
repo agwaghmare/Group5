@@ -1,5 +1,8 @@
 # Employee implementation status
 
+**Portfolio extension:** assigned-client risk management, self-assignment, calculated assessments and approved simulated rebalancing are implemented. See [PORTFOLIO_SETUP.md](PORTFOLIO_SETUP.md) for schema, synthetic-data limitations, API and verification.
+
+
 **Current verification:** account-based workspaces and NVIDIA Bessie are implemented.
 The NVIDIA adapter's backend suite and lint pass; the prior chat UI checks passed
 17 frontend tests and type/build checks. A live synthetic workspace NVIDIA request

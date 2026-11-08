@@ -97,7 +97,7 @@ def role_catalog():
 
 
 def sync_roles(db):
-    """Create missing roles and move an existing credit analyst off Learn/Wilbur.
+    """Create missing roles and move credit/portfolio reviewers off Learn/Wilbur.
 
     Other stored feature lists stay as written. A database grant that is narrower
     than the code registry must keep failing closed.
@@ -107,7 +107,7 @@ def sync_roles(db):
         if not role:
             db.add(Role(key=key, label=label, tabs=tabs, features=features))
             continue
-        outdated = key == "credit_analyst" and (
+        outdated = key in ("credit_analyst", "portfolio_manager") and (
             list(role.tabs or []) != tabs or "learn.explain" in (role.features or []) or "learn" in (role.tabs or [])
         )
         if outdated:
