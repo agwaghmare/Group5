@@ -99,12 +99,10 @@ def session(store=Depends(current_identity)):
 
 
 def allow(store, feature, write=False):
-    role = store.employee["role"]
-    if role not in FEATURES.get(feature, []):
-        fail(store, "Not available for your role", feature)
-    if feature == "staff.decision" and write and role != "credit_analyst":
-        fail(store, "Compliance can review decisions but cannot write them", feature)
+    from app.orm.authorization import require_feature
+    require_feature(store, feature, write)
     store.audit("feature_access", feature)
+
 
 
 def assigned(store, table, key):
@@ -112,6 +110,16 @@ def assigned(store, table, key):
     if not row:
         fail(store, "Resource not found or unavailable for your role", key, 404)
     return row
+
+
+def prospect_for_grant(store, key):
+    from app.orm.authorization import require_feature
+    from app.orm.models import Prospect
+    require_feature(store, "staff.creditresearch")
+    row = store.db.get(Prospect, key)
+    if not row:
+        fail(store, "Prospect not found", key, 404)
+    return {k: row.payload[k] for k in ("id", "assigned_to", "application_ref", "product")}
 
 
 def grant_for(store, grant_id, prospect_id=None):
@@ -129,7 +137,9 @@ def public_prospect(row):
 
 
 def run_for(store, key):
-    row = assigned(store, "runs", key)
+    row = store.get("runs", key)
+    if not row:
+        fail(store, "Run unavailable for this analyst", key)
     if row["employee_id"] != store.employee["id"]:
         fail(store, "Research run belongs to another analyst", key)
     grant_for(store, row["grant_id"], row["prospect_id"])
@@ -194,10 +204,10 @@ def logout(authorization: str = Header(), store=Depends(session)):
 @router.get("/me")
 def me(store=Depends(session)):
     store.audit("session_profile_read")
-    return {"employee": store.employee, "tabs": visible(store.employee["role"]),
-            "features": capabilities(store.employee["role"]), "banner": BANNER,
+    return {"employee": store.employee, "tabs": store.user.role.tabs,
+            "features": store.user.role.features, "banner": BANNER,
             "storage": "sqlalchemy_sqlite", "user": public_user(store.user),
-            "agent_provider": "mock", "synthetic_demo": True}
+            "agent_provider": "mistral" if os.environ.get("MISTRAL_API_KEY") else "unconfigured", "synthetic_demo": store.user.synthetic}
 
 
 @router.get("/registry")
@@ -235,7 +245,7 @@ def prospect_queue(store=Depends(session)):
 @router.post("/access-grants", status_code=201)
 def access_grant(body: Grant, store=Depends(session)):
     allow(store, "staff.creditresearch")
-    prospect = assigned(store, "prospects", body.prospect_id)
+    prospect = prospect_for_grant(store, body.prospect_id)
     conflict = any(r["employee_id"] == store.employee["id"] and r["prospect_id"] == prospect["id"] for r in store.all("links"))
     if conflict:
         fail(store, "Conflict of interest: another analyst must handle this prospect", prospect["id"])
@@ -460,12 +470,9 @@ def audit(action: str | None = None, outcome: str | None = None, actor: str | No
 
 
 def aggregate_research(store):
-    runs, decisions = store.all("runs"), store.all("decisions")
-    counts = {outcome: sum(r["outcome"] == outcome for r in runs) for outcome in OUTCOMES}
-    return {"group_size": len(runs), "outcomes": {k: v if v >= 5 else None for k, v in counts.items()},
-            "decision_count": len(decisions) if len(decisions) >= 5 else None,
-            "override_rate": sum(r["override"] for r in decisions)/len(decisions) if len(decisions) >= 5 else None,
-            "suppression_threshold": 5, "suppression_notice": "Groups smaller than five are suppressed."}
+    from app.orm.metrics import research_metrics
+    return research_metrics(store)
+
 
 
 @router.get("/portfolio")
@@ -508,17 +515,8 @@ def reviews(store=Depends(session)):
 def fairness(store=Depends(session)):
     allow(store, "staff.fairness")
     store.audit("fairness_metrics_read")
-    labels = {r["id"]: r["group_label"] for r in store.all("protected")}
-    latest = {}
-    for run in sorted(store.all("runs"), key=lambda r: r["run_at"]):
-        latest[run["prospect_id"]] = run
-    groups = {}
-    for pid, run in latest.items():
-        group = labels.get(pid)
-        if group is not None:
-            groups.setdefault(group, []).append(run["outcome"] == "MEETS_POLICY")
-    measured = {label: {"n": len(values), "meets_policy_rate": sum(values)/len(values)}
-                for label, values in groups.items()}
+    from app.orm.metrics import fairness_metrics
+    measured = fairness_metrics(store)
     reference = measured.get("A", {}).get("meets_policy_rate", 0)
     metrics = []
     for label, value in measured.items():
@@ -596,11 +594,48 @@ def assistant(body: Ask, store=Depends(session)):
     elif body.feature_id == "staff.portfolio":
         evidence = portfolio(store)
         answer = "Only aggregates allowed for your role are available. Groups smaller than five are suppressed."
+    elif body.feature_id == "staff.audit":
+        evidence = {"events": audit(limit=20, store=store)["events"]}
+    elif body.feature_id == "staff.fairness":
+        evidence = fairness(store)
+    elif body.feature_id == "staff.decision":
+        evidence = {"decisions": decisions(store)["decisions"][-20:]}
+    elif body.feature_id == "staff.campaigns":
+        evidence = audience(store)
+    elif body.feature_id == "staff.anomaly":
+        evidence = anomalies(store)
+    elif body.feature_id == "staff.access":
+        evidence = {"role": store.user.role_key, "tabs": store.user.role.tabs, "features": store.user.role.features}
     else:
         answer = "Use the role-scoped workspace endpoints for this feature. Mock Bessie does not interpret free text or perform mutations."
-    store.audit("mock_assistant", body.resource_id or body.feature_id, feature=body.feature_id)
-    return {"agent": "Wilbur" if body.feature_id == "learn.explain" else "Bessie", "provider": "mock",
-            "status": "placeholder_no_external_model", "answer": answer, "evidence": evidence,
-            "trace": ["role_gate", "fetch_authorized_context", "deterministic_compute", "structured_evidence", "mock_explain"],
-            "limitations": ["Question text is not interpreted by a live model.", "No external action was taken."],
-            "synthetic": True, "banner": BANNER}
+    from app.agents.bessie import AgentError, explain
+    from app.orm.models import AuthSession, User
+    original_role, user_id = store.user.role_key, store.user.id
+    token_digest = store.auth_token_digest
+    # Do not hold SQLite's write lock across a network request.
+    store.db.commit()
+    try:
+        result = explain(body.question, original_role, body.feature_id, evidence)
+    except AgentError as exc:
+        store.audit("assistant_failed", body.resource_id or body.feature_id, "failed", status=exc.status)
+        raise HTTPException(exc.status, exc.message) from None
+    store.db.expire_all()
+    current = store.db.get(User, user_id)
+    auth = store.db.get(AuthSession, token_digest)
+    if not current or not current.active or not auth or auth.payload["expires_at"] <= now():
+        fail(store, "Your session expired during the request", "assistant", 401)
+    if current.role_key != original_role:
+        fail(store, "Your role changed. Refresh your workspace.", "assistant")
+    from app.orm.identity import set_identity
+    set_identity(store, current)
+    allow(store, body.feature_id)
+    if body.resource_id and (body.feature_id in ("staff.creditresearch", "staff.prospect") or
+                            (body.feature_id == "learn.explain" and original_role == "credit_analyst")):
+        run_for(store, body.resource_id)
+    if body.feature_id == "staff.cases":
+        assigned(store, "cases", body.resource_id)
+    store.audit("assistant_answer", body.resource_id or body.feature_id, feature=body.feature_id,
+                model=result["model"], prompt_version=result["prompt_version"])
+    return {**result, "agent": "Wilbur" if body.feature_id == "learn.explain" else "Bessie",
+            "evidence": evidence, "synthetic": True, "banner": BANNER,
+            "trace": ["role_gate", "scoped_evidence", "deterministic_compute", "mistral_explain", "evidence_validation"]}

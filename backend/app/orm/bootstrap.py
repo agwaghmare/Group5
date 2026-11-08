@@ -1,12 +1,14 @@
 """Validated, idempotent personal finance CSV import plus synthetic login identities."""
 import csv
 import hashlib
+import secrets
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from sqlalchemy import Integer, Numeric, select
 
+from app.orm.accounts import demo_seed_enabled
 from app.orm.models import Customer, DataImport, Employee, FinanceSnapshot, Role, User
 from app.pnc.auth_users import hash_password
 from app.settings import BACKEND
@@ -62,13 +64,13 @@ def import_tracker(db, path=TRACKER):
             rows.append(record)
     if not rows:
         raise ValueError("Tracker is empty")
-    password = hash_password("demo")
+    password = hash_password("demo" if demo_seed_enabled() else secrets.token_urlsafe(40))
     customer_ids = sorted({r["user_id"] for r in rows})
     for tracker_id in customer_ids:
         uid = f"U{tracker_id}"
         if not db.get(User, uid):
             db.add(User(id=uid, email=f"customer{tracker_id}@example.test", role_key="customer",
-                        password_hash=password, display_name=f"Synthetic customer {tracker_id}"))
+                        password_hash=password, active=demo_seed_enabled(), display_name=f"Synthetic customer {tracker_id}"))
             db.flush()
         if not db.get(Customer, tracker_id):
             db.add(Customer(tracker_id=tracker_id, user_id=uid))
@@ -96,12 +98,12 @@ def seed_identities(db):
         if not role:
             db.add(Role(key=key, label=label, tabs=tabs, features=features))
     db.flush()
-    password = hash_password("demo")
+    password = hash_password("demo" if demo_seed_enabled() else secrets.token_urlsafe(40))
     for employee in db.scalars(select(Employee)):
         if not db.get(User, "U-"+employee.id):
             db.add(User(id="U-"+employee.id, email=employee.id.lower()+"@example.test",
                         role_key=employee.payload["role"], employee_id=employee.id,
-                        password_hash=password, display_name=employee.payload["display_name"]))
+                        password_hash=password, active=demo_seed_enabled(), display_name=employee.payload["display_name"]))
     db.flush()
     if not db.get(DataImport, TRACKER.name):
         import_tracker(db)

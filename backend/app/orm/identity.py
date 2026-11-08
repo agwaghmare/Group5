@@ -25,7 +25,8 @@ def public_user(user):
             "customer_id": str(user.customer.tracker_id) if user.customer else None,
             "tracker_user_id": user.customer.tracker_id if user.customer else None,
             "employee_id": user.employee_id, "is_staff": user.role_key != "customer",
-            "home_route": "/finance" if user.role_key == "customer" else "/"+user.role.tabs[1],
+            "home_route": "/finance" if user.role_key == "customer" else "/employee",
+            "workspace": "finance" if user.role_key == "customer" else user.role.tabs[1],
             "synthetic": user.synthetic}
 
 
@@ -37,7 +38,7 @@ def issue_session(store, user):
     set_identity(store, user)
     store.audit("login", user.id)
     return {"access_token": token, "token": token, "token_type": "bearer", "expires_at": expiry,
-            "user": public_user(user), "synthetic_demo": True}
+            "user": public_user(user), "synthetic_demo": user.synthetic}
 
 
 def set_identity(store, user):
@@ -68,4 +69,5 @@ def current_identity(authorization: str | None = Header(default=None), store=Dep
         store.audit("access_denied", "session", "denied", reason="Invalid or expired session")
         raise HTTPException(401, "Missing, expired, or revoked session")
     set_identity(store, user)
+    store.auth_token_digest = digest(token)
     return store
