@@ -261,11 +261,6 @@ export function LandingPage() {
                   <Link to={s.to}>{s.cta ?? "Open"}</Link>
                 </Button>
               )}
-              {i === 0 && (
-                <Button asChild variant="outline" className="mt-4 w-fit" size="lg">
-                  <Link to="/employee">Employee sign in</Link>
-                </Button>
-              )}
             </section>
           ))}
         </div>
