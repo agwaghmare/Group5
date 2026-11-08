@@ -52,12 +52,12 @@ with the same tracker ownership. No endpoint lets a customer promote their role.
 
 ## Environment
 
-Your existing Mistral key is preserved in the ignored backend/.env. It only needs:
+Your existing keys are preserved; the adapter reads only NVIDIA_API_KEY, stored in the ignored backend/.env. It only needs:
 
 ```dotenv
-MISTRAL_API_KEY=YOUR_MISTRAL_API_KEY
+NVIDIA_API_KEY=YOUR_NVIDIA_API_KEY
 # Optional model override; this is also the code default.
-MISTRAL_MODEL=mistral-small-latest
+NVIDIA_MODEL=nemotron-3.5-super-vl-120b-a12b
 
 DATABASE_URL=sqlite:///storage/finpilot_local.sqlite3
 DEMO_LOGIN_ENABLED=false
@@ -89,19 +89,45 @@ session. It can be reintroduced later with server verification and account mappi
 
 ## Bessie's prompt and request
 
-Prompt: `app/agents/prompts/bessie.md`, version bessie-v1.
+Prompt: `app/agents/prompts/bessie.md`, version bessie-v3.
 Adapter: `app/agents/bessie.py`. The existing `/staff/assistant` endpoint is live.
-The staff `learn.explain` feature also uses this provider with inherited staff
+Requests default to `agent: "bessie"`; Bessie keeps her identity on every tab.
+The explicit staff Explain This panel uses `agent: "wilbur"` with `learn.explain`
+and its separate `app/agents/prompts/wilbur.md` prompt (wilbur-v2), inheriting staff
 permissions. Customer Amelia and customer Learn's existing deterministic tools
 are not silently replaced by this integration.
 
+Greetings and short help requests return an immediate role-scoped application
+welcome without calling NVIDIA or retrieving financial evidence. General chat
+starts with workspace metadata, not benefits figures. Benefits evidence is used
+on the Benefits tab or for an explicit benefits question. A question without a
+selected research run receives general help, not an unrelated benefit balance.
+Conceptual answers may have no citations; every fact placeholder remains checked.
+
+Nemotron thinking is disabled for concise interactive replies. Provider reads time out after 20 seconds;
+the browser cancels after 25 seconds and shows a retry message. Duplicate requests
+are disabled while pending; leaving the chat cancels its browser request. Replies
+show plain answer text and expandable evidence instead of provider/status badges.
+
 The pipeline authenticates the user, checks role/feature/record scope, computes
-or retrieves authorized evidence, calls Mistral, then validates the answer. The
+or retrieves authorized evidence, calls NVIDIA, then validates the answer. The
 provider has no SQL tool, no mutation tool and no ability to choose another URL.
 For research, select a prospect, complete the purpose gate and run the policy
 engine before asking Bessie about that run. Code computes; Bessie explains.
 
-Mistral receives the question, role, feature and a fact map of authorized evidence.
+NVIDIA receives the question, role, feature and a fact map of authorized evidence.
+Numerical values and identifiers containing digits are sent as fact placeholders;
+original values and formatted financial amounts stay on the server. Code-computed
+outcomes and rule statuses remain available for qualitative explanation. Agent
+instructions and context share one system message to keep their ordering explicit.
+The API request uses strict `response_format: json_schema` to require all four
+response fields, rather than accepting arbitrary JSON. Prompts use bullets instead
+of numbered steps and describe conceptual formulas in words. This prevents ordinary
+step requests from introducing literal numbers that the evidence validator rejects.
+If a completed draft fails validation, the adapter regenerates once with fixed
+formatting instructions within the same time budget. It never displays or resends
+the invalid draft; a second failure remains an error. Refusals, incomplete output,
+provider failures and timeouts are not retried through this formatting path.
 It never receives .env, account passwords or the API key as prompt content. No
 unfiltered customer table, excluded credit attributes or cross-role records are
 sent. Individual case context must already be consented and assigned.
@@ -136,23 +162,42 @@ Provider 429 returns a rate-limit/quota error; timeout returns 504. Invalid mode
 output returns 502 and is not replaced with a fake successful answer. Upstream
 response bodies and credentials are never returned to the frontend.
 
-The live integration probe during implementation reached Mistral and received
-HTTP 429. Resolve the workspace quota/billing/rate limit in Mistral Studio before
-expecting live answers. This did not establish a successful live completion.
+The adapter uses NVIDIA's fixed HTTPS chat-completions endpoint with Bearer
+header authentication. NVIDIA_MODEL accepts the short model name or its full
+`nvidia/` prefix; the API always receives the full model ID. JSON answers are
+validated locally with the same evidence and role checks. Reasoning content is
+never returned to the browser. No Gemini or Mistral key is used as a fallback.
+Official model and API example:
+https://build.nvidia.com/nvidia/nemotron-3.5-super-vl-120b-a12b .
 
 ```sh
 python -m pytest -q
 ruff check app tests scripts manage_database.py
 ```
 
-Tests use temporary SQLite databases, explicit demo fixtures and mocked Mistral
+Tests use temporary SQLite databases, explicit demo fixtures and mocked NVIDIA
 HTTP responses. They cover normal provisioning, archived sample-account sessions,
 role views, central record scope, evidence formatting, denied egress, malformed
 answers, provider failures, and role changes while a model request is in flight.
 Frontend checks include type checking, login/password/role tests and a production
 build. No test suite uses your real key or modifies your normal database.
 
-Implementation verification: 72 backend tests passed; 195 archived Tiger/Lab
-tests skipped. All 13 frontend tests, TypeScript, the production build, backend
-lint and changed-file frontend lint passed. Repo-wide frontend lint still reports
-871 formatting errors in 59 unchanged files; those unrelated files were not rewritten.
+NVIDIA verification: backend lint and provider-contract tests pass. A live request
+with synthetic workspace context used the configured NVIDIA key and
+`nvidia/nemotron-3.5-super-vl-120b-a12b`; Bessie replied in 1.79 seconds and passed
+evidence validation. No account credentials or customer records were sent. Tests
+also check short/full model names, role isolation, separate agent prompts,
+unknown citations, timeouts, refusal/truncation and hidden reasoning content.
+
+Validation regression: "What is debt-to-income? Give me 3 steps." reproduced an
+answer-only JSON object with unsupported literal numbers before this fix. The
+same synthetic question passed a live NVIDIA check after schema enforcement and
+prompt clarification. Financial numbers still require authorized fact placeholders;
+neither missing citations nor invented figures are accepted. The user's Research
+question, "what does this research mean?", also reproduced raw-number failures.
+After tokenizing numeric context, a live check using a generated synthetic run
+passed and explained the recorded outcome. Regression tests verify server-only
+money rendering, bounded regeneration and refusal to return repeated invalid drafts.
+Final validation-fix checks: 93 backend tests passed, 195 archived tests skipped;
+backend lint passed. The final live synthetic research reply passed validation
+and included a server-rendered evidence citation.

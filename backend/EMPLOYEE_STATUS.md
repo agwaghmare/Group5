@@ -1,15 +1,16 @@
 # Employee implementation status
 
-**Current verification:** account-based workspaces and Mistral Bessie are implemented;
-72 backend tests and 13 frontend tests pass, with frontend type/build checks and
-backend/changed-file lint passing. The live Mistral probe returned HTTP 429;
-successful live completion remains externally blocked by quota/rate limiting.
+**Current verification:** account-based workspaces and NVIDIA Bessie are implemented.
+The NVIDIA adapter's backend suite and lint pass; the prior chat UI checks passed
+17 frontend tests and type/build checks. A live synthetic workspace NVIDIA request
+succeeded in 1.79 seconds and passed evidence validation. Details are recorded in
+BESSIE_SETUP.md.
 Old sample logins are disabled, their data/history is preserved, and an operator
 must adopt/provision the intended email account. See BESSIE_SETUP.md. SQLite
 permissions are application-enforced, not database-user RLS. Finance workshop/Lab
 coverage was not changed or revalidated in this account-and-agent task.
 
-**Current account/AI setup:** see [BESSIE_SETUP.md](BESSIE_SETUP.md). Normal sign-in now requires a provisioned email/password account. Demo login and auto-seeding are disabled; old sample logins below are historical. Bessie uses MISTRAL_API_KEY directly, without AGENT_PROVIDER. Existing financial data remains synthetic.
+**Current account/AI setup:** see [BESSIE_SETUP.md](BESSIE_SETUP.md). Normal sign-in now requires a provisioned email/password account. Demo login and auto-seeding are disabled; old sample logins below are historical. Bessie uses NVIDIA_API_KEY directly, without AGENT_PROVIDER. Existing financial data remains synthetic.
 
 **Storage update:** the active backend now uses SQLAlchemy + local SQLite with
 email-based users and a shared role directory. Tiger and Lab Package integrations

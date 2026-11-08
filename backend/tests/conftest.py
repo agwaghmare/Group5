@@ -91,4 +91,5 @@ def explicit_test_demo_data(monkeypatch, tmp_path):
     monkeypatch.setenv("STAFF_SQLITE_PATH", str(tmp_path / "isolated-default.sqlite3"))
     monkeypatch.setenv("DEMO_LOGIN_ENABLED", "true")
     monkeypatch.setenv("STAFF_DEMO_ENABLED", "true")
-    monkeypatch.setenv("MISTRAL_API_KEY", "")
+    monkeypatch.setenv("NVIDIA_API_KEY", "")
+    monkeypatch.setenv("NVIDIA_MODEL", "nvidia/nemotron-3.5-super-vl-120b-a12b")
