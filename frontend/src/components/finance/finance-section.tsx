@@ -5,12 +5,13 @@ import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, T
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { CustomerInvestments } from "@/components/finance/customer-investments";
 import { Textarea } from "@/components/ui/textarea";
 import { useCustomerSession } from "@/lib/customer-session";
 import { savingsTransfer, trimmedBills, savingsGoal, loanPlan, projectCash } from "@/lib/finance-scenarios";
 import { askAmelia, loadTracker, money, num, pct, type Snapshot } from "@/lib/finance-api";
 
-export type FinanceView = "money" | "bills" | "goals" | "health" | "whatif";
+export type FinanceView = "money" | "bills" | "goals" | "health" | "whatif" | "investments";
 
 export const VIEW_FEATURE: Record<FinanceView, string> = {
   money: "fin.profile",
@@ -18,6 +19,7 @@ export const VIEW_FEATURE: Record<FinanceView, string> = {
   goals: "fin.moneymission",
   health: "fin.debt",
   whatif: "fin.futureyou",
+  investments: "fin.investments",
 };
 
 const AMELIA_SKILLS: { id: string; label: string }[] = [
@@ -37,6 +39,7 @@ const NAV: { id: FinanceView; label: string }[] = [
   { id: "goals", label: "Savings" },
   { id: "health", label: "Loans & Health" },
   { id: "whatif", label: "What If" },
+  { id: "investments", label: "Investments" },
 ];
 
 export function FinanceSection({
@@ -86,6 +89,7 @@ export function FinanceSection({
       {latest && view === "goals" && <GoalsView key={`${latest.user_id}:${latest.date}`} latest={latest} history={history} />}
       {latest && view === "health" && <HealthView key={`${latest.user_id}:${latest.date}`} latest={latest} />}
       {latest && view === "whatif" && <WhatIfView key={`${latest.user_id}:${latest.date}`} latest={latest} />}
+      {view === "investments" && <CustomerInvestments />}
     </div>
   );
 }

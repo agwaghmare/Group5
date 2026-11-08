@@ -78,7 +78,7 @@ def set_holdings(db, account):
     db.flush()
 
 
-def seed_synthetic(db):
+def seed_synthetic(db, client_id=None):
     """Idempotent demo additions only for customers sourced from the synthetic tracker."""
     end = db.scalar(select(func.max(FinanceSnapshot.date)))
     if not end:
@@ -101,6 +101,8 @@ def seed_synthetic(db):
     eligible = db.scalars(select(Customer).where(Customer.source_type == "synthetic_finance_tracker",
         ~Customer.tracker_id.in_(select(PortfolioAccount.client_id)))).all()
     for customer in eligible:
+        if client_id is not None and customer.tracker_id != client_id:
+            continue
         f = latest_finance(db, customer.tracker_id)
         if not f or f.portfolio_value is None or f.portfolio_value <= 0:
             continue
@@ -209,8 +211,8 @@ def suitable_weights(returns, current, risk_budget, goal):
     return max(choices)[1] if choices else None
 
 
-def assessment(store, account, weights=None):
-    profile = store.db.get(InvestmentProfile, account.client_id)
+def assessment(store, account, weights=None, profile_override=None):
+    profile = profile_override or store.db.get(InvestmentProfile, account.client_id)
     f = latest_finance(store.db, account.client_id)
     returns, dates, source = market_matrix(store.db)
     a = weights or allocation(account)

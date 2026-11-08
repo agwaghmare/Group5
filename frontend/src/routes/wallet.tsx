@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createClientOnlyFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { Component, useState, lazy, Suspense, type ErrorInfo, type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
@@ -12,15 +13,15 @@ import { loadTracker } from "@/lib/finance-api";
 // Lazy-load Solana-dependent components so they are never bundled into the
 // Nitro/Cloudflare Workers server build (rpc-websockets and @solana/codecs
 // have no "workerd" exports condition).
-const LazyPaymentsTab = lazy(() =>
+const LazyPaymentsTab = lazy(createClientOnlyFn(() =>
   import("@/components/wallet/payments-tab").then((m) => ({ default: m.PaymentsTab })),
-);
-const LazyCoinForgeTab = lazy(() =>
+));
+const LazyCoinForgeTab = lazy(createClientOnlyFn(() =>
   import("@/components/wallet/coinforge-tab").then((m) => ({ default: m.CoinForgeTab })),
-);
-const LazyWalletProvider = lazy(() =>
+));
+const LazyWalletProvider = lazy(createClientOnlyFn(() =>
   import("@/lib/solana/wallet-context").then((m) => ({ default: m.WalletProvider })),
-);
+));
 
 type WalletView = "milestones" | "payments" | "coinforge";
 

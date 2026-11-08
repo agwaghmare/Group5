@@ -15,7 +15,7 @@ DEFAULT_MODEL = "nvidia/nemotron-3.5-super-vl-120b-a12b"
 FACT = re.compile(r"\{\{(f\d{4,})\}\}")
 FEATURES = (
     "fin.profile", "fin.xray", "fin.futureyou", "fin.moneymission", "fin.immune",
-    "fin.moneyleaks", "fin.debt", "fin.rewards", "fin.fraud", "fin.coach", "fin.modellab",
+    "fin.moneyleaks", "fin.debt", "fin.rewards", "fin.fraud", "fin.coach", "fin.modellab", "fin.investments",
 )
 RATIO_LEAVES = {"credit_utilization", "dti", "debt_to_income", "utilization", "value"}
 MONEY_MARKERS = (

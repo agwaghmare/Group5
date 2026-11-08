@@ -7,7 +7,7 @@ type FinanceSearch = {
   view?: FinanceView | undefined;
 };
 
-const VIEWS: FinanceView[] = ["money", "bills", "goals", "health", "whatif"];
+const VIEWS: FinanceView[] = ["money", "bills", "goals", "health", "whatif", "investments"];
 
 export const Route = createFileRoute("/finance")({
   validateSearch: (search: Record<string, unknown>): FinanceSearch => {

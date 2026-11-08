@@ -113,6 +113,12 @@ def evidence_for(feature, rows):
                 "available_balance": data["available_balance"], "portfolio_value": data["portfolio_value"],
                 "home_equity": data["home_equity"], "total_debt_balance": data["total_debt_balance"],
                 "monthly_income": data["monthly_income"], "pay_frequency": data["pay_frequency"]}
+    if feature == "fin.investments":
+        return {"as_of": data["date"], "portfolio_value": data["portfolio_value"],
+                "equity_allocation_pct": data["equity_allocation_pct"],
+                "investment_volatility": data["investment_volatility"],
+                "retirement_contribution": data["retirement_contribution"],
+                "limitation": "Recorded synthetic tracker only; current slider scenarios are not included in this explanation."}
     if feature == "fin.xray":
         return xray_from(latest)
     if feature == "fin.futureyou":

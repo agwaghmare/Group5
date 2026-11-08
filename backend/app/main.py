@@ -21,6 +21,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import get_settings, validate_production_settings
 from app.core.logging import configure_logging
 from app.routers.identity import router as auth_router
+from app.routers.customer_portfolio import router as customer_portfolio_router
 from app.routers.learn import router as learn_router
 from app.routers.solana import router as solana_router
 
@@ -78,6 +79,7 @@ async def db_error(request: Request, exc: sqlalchemy.exc.DBAPIError):
 
 
 app.include_router(auth_router)
+app.include_router(customer_portfolio_router)
 app.include_router(customer_router)
 app.include_router(learn_router)
 app.include_router(staff_router)
