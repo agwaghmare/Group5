@@ -203,6 +203,23 @@ def test_missing_database_feature_grant_fails_closed(local):
     assert local.post("/staff/access-grants", headers=h, json={"prospect_id":"P001", "purpose":"application_review", "reference_id":"APP-001"}).status_code == 403
 
 
+def test_activity_role_migration_removes_wilbur_without_restoring_revoked_grants(local):
+    from app.orm.bootstrap import sync_roles
+    from app.orm.models import Role
+
+    h = login(local)
+    with Store() as store:
+        role = store.db.get(Role, "credit_analyst")
+        role.tabs = ["home", "research", "benefits", "learn"]
+        role.features = [f for f in role.features if f != "staff.creditresearch"] + ["learn.explain"]
+        sync_roles(store.db)
+        assert role.tabs == ["home", "research", "benefits", "activity"]
+        assert "learn.explain" not in role.features
+        assert "staff.creditresearch" not in role.features
+    assert local.post("/staff/access-grants", headers=h, json={
+        "prospect_id": "P001", "purpose": "application_review", "reference_id": "APP-001"}).status_code == 403
+
+
 def test_no_automatic_demo_employees_and_provisioned_login(local, monkeypatch, tmp_path):
     monkeypatch.setenv("SEED_DEMO_DATA", "false")
     monkeypatch.setenv("DEMO_LOGIN_ENABLED", "false")
@@ -318,7 +335,7 @@ def test_greetings_are_bessie_without_financial_context_or_network(local, monkey
     h = login(local)
     calls = []
     install_nvidia(monkeypatch, lambda req: calls.append(req) or completion(req))
-    response = local.post("/staff/assistant", headers=h, json={"feature_id": "learn.explain", "question": question})
+    response = local.post("/staff/assistant", headers=h, json={"feature_id": "staff.access", "question": question})
     assert response.status_code == 200
     body = response.json()
     assert body["agent"] == "Bessie" and "I'm Bessie" in body["answer"]
@@ -327,7 +344,7 @@ def test_greetings_are_bessie_without_financial_context_or_network(local, monkey
 
 
 def test_explicit_wilbur_is_separate_from_bessie(local, monkeypatch):
-    h = login(local)
+    h = login(local, "E003")
     captured = []
     install_nvidia(monkeypatch, lambda req: captured.append(json.loads(req.content)) or completion(req))
     for agent, name in [("bessie", "Bessie"), ("wilbur", "Wilbur")]:
@@ -341,6 +358,12 @@ def test_explicit_wilbur_is_separate_from_bessie(local, monkeypatch):
         assert captured[-1]["chat_template_kwargs"]["enable_thinking"] is False
     denied = local.post("/staff/assistant", headers=h, json={"agent": "wilbur", "feature_id": "staff.audit", "question": "hi"})
     assert denied.status_code == 403
+    analyst = login(local)
+    removed = local.post("/staff/assistant", headers=analyst, json={
+        "agent": "wilbur", "feature_id": "staff.creditresearch", "question": "Explain utilization"})
+    assert removed.status_code == 403
+    assert local.post("/staff/assistant", headers=analyst, json={
+        "feature_id": "learn.explain", "question": "Explain utilization"}).status_code == 403
 
 
 def test_plain_conceptual_response_does_not_require_an_irrelevant_fact():

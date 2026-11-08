@@ -35,7 +35,7 @@ implementation remains with the teammate. This is not a completed production sys
 | staff.fairness | Recorded-run rates by synthetic groups and offline seed mirror-pair invariance; illustrative ratios only. |
 | staff.campaigns | Fail-closed empty audience because consent/protection/channel data is missing; creation blocked. |
 | staff.anomaly | Explicit unavailable state until fin.fraud provides detections. |
-| learn.explain | Mock Wilbur benefit formulas and role-authorized recorded credit evidence. |
+| learn.explain | Other roles only. Credit analysts do not get Learn or Wilbur; Bessie covers their research evidence. |
 
 Bessie is a deterministic placeholder, with no model calls. It reports mock status
 and returns authorized evidence. Agent keys exist only as placeholders in the

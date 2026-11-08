@@ -182,6 +182,13 @@ class CreditDecision(Record, Base):
     override: Mapped[bool] = mapped_column(Boolean)
 
 
+class DecisionDraft(Record, Base):
+    """Editable in-progress decision. The recorded decision row stays append-only."""
+    __tablename__ = "decision_drafts"
+    employee_id: Mapped[str] = mapped_column(String(50), index=True)
+    run_id: Mapped[str] = mapped_column(String(100), unique=True)
+
+
 class HandoffCase(Record, Base):
     __tablename__ = "cases"
 
@@ -226,7 +233,7 @@ class Permission(Record, Base):
 
 RECORD_MODELS = {model.__tablename__: model for model in (
     Employee, Prospect, CreditProfile, ProtectedProfile, EmployeeLink, CreditPolicy,
-    AccessGrant, ResearchRun, CreditDecision, HandoffCase, CaseEvent, BenefitCatalog,
+    AccessGrant, ResearchRun, CreditDecision, DecisionDraft, HandoffCase, CaseEvent, BenefitCatalog,
     BenefitRule, Redemption, AuditLog, AuthSession, Campaign, Anomaly, Permission,
 )}
 TRACKER_COLUMNS = [column.name for column in FinanceSnapshot.__table__.columns]

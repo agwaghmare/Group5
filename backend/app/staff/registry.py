@@ -21,14 +21,16 @@ FEATURES = {
     "staff.fairness": ["compliance_analyst"],
     "staff.campaigns": ["marketing_analyst"],
     "staff.anomaly": ["compliance_analyst"],
-    "learn.explain": ALL,
+    "learn.explain": [role for role in ALL if role != "credit_analyst"],
 }
-BANNER = "Synthetic data. Prototype policy rules, not PNC policy. Recommendations support a human decision."
+BANNER = "Synthetic data. Prototype policy rules, not PNC policy."
 
 
 def visible(role):
     workspace = ROLES[role][1]
-    return list(dict.fromkeys(["home", workspace, "benefits", "learn"]))
+    # Credit analysts review decisions on Activity. They do not get Learn or Wilbur.
+    tail = "activity" if role == "credit_analyst" else "learn"
+    return list(dict.fromkeys(["home", workspace, "benefits", tail]))
 
 
 def capabilities(role):
