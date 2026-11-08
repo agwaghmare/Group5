@@ -26,7 +26,7 @@ class DemoLogin(BaseModel):
 
 
 def require_demo():
-    if os.environ.get("APP_ENV", "dev") == "prod" or os.environ.get("DEMO_LOGIN_ENABLED", "true").lower() != "true":
+    if os.environ.get("APP_ENV", "dev") == "prod" or os.environ.get("DEMO_LOGIN_ENABLED", "false").lower() != "true":
         raise HTTPException(404, "Demo login is disabled")
 
 

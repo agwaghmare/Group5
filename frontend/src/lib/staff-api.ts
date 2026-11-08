@@ -1,4 +1,5 @@
-const BASE = (import.meta.env["VITE_LEARN_API_URL"] as string | undefined) ?? "/api";
+const BASE =
+  (import.meta.env["VITE_LEARN_API_URL"] as string | undefined) ?? "/api";
 
 export class StaffError extends Error {
   status: number;
@@ -8,7 +9,15 @@ export class StaffError extends Error {
   }
 }
 
-export type StaffTab = "home" | "research" | "cases" | "portfolio" | "compliance" | "benefits" | "activity" | "learn";
+export type StaffTab =
+  | "home"
+  | "research"
+  | "cases"
+  | "portfolio"
+  | "compliance"
+  | "benefits"
+  | "activity"
+  | "learn";
 
 export interface Persona {
   id: string;
@@ -65,11 +74,11 @@ export async function staffFetch<T>(
   const token = init.token === undefined ? readStaffToken() : init.token;
   const headers: Record<string, string> = {};
   if (init.body !== undefined) headers["Content-Type"] = "application/json";
-  if (token) headers.Authorization = `Bearer ${token}`;
+  if (token) headers["Authorization"] = `Bearer ${token}`;
   const response = await fetch(`${BASE}/staff${path}`, {
     method: init.method ?? (init.body !== undefined ? "POST" : "GET"),
     headers,
-    body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+    ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
   });
   if (response.status === 204) return undefined as T;
   const payload = await response.json().catch(() => ({}));

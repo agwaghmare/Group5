@@ -82,3 +82,13 @@ def q():
     def run(conn, sql, **params):
         return conn.execute(text(sql), params).all()
     return run
+
+
+@pytest.fixture(autouse=True)
+def explicit_test_demo_data(monkeypatch, tmp_path):
+    # Fixtures are opt-in in tests only; normal startup never makes demo employees.
+    monkeypatch.setenv("SEED_DEMO_DATA", "true")
+    monkeypatch.setenv("STAFF_SQLITE_PATH", str(tmp_path / "isolated-default.sqlite3"))
+    monkeypatch.setenv("DEMO_LOGIN_ENABLED", "true")
+    monkeypatch.setenv("STAFF_DEMO_ENABLED", "true")
+    monkeypatch.setenv("MISTRAL_API_KEY", "")
