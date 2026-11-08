@@ -91,7 +91,7 @@ def fail(store, message, resource="", status=403):
 
 
 def demo_enabled():
-    if os.environ.get("STAFF_DEMO_ENABLED", "false").lower() != "true":
+    if os.environ.get("APP_ENV", "dev") == "prod" or os.environ.get("STAFF_DEMO_ENABLED", "false").lower() != "true":
         raise HTTPException(404, "Demo persona login is disabled")
 
 

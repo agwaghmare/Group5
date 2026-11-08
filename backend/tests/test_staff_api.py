@@ -1,18 +1,17 @@
 """Run: python -m unittest discover -s tests -p 'test_staff*.py' -v"""
-import copy
 import json
 import os
 import sqlite3
 import tempfile
 import unittest
-from datetime import date, datetime, timedelta, timezone
+from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.staff.policy import ALLOWED, POLICY, evaluate, validate_result
+from app.staff.policy import evaluate, validate_result
 from app.staff.registry import FEATURES, ROLES, visible
 from app.staff.seed import employees, prospects, tenure_months
 from app.staff.store import Store
@@ -185,7 +184,7 @@ class StaffAPI(unittest.TestCase):
 
     def test_append_only_database_records(self):
         h=self.login()
-        run=self.run_research(h)
+        self.run_research(h)
         with Store() as store:
             for table in ('audit','runs','policies','catalog','benefit_rules'):
                 with self.assertRaises(sqlite3.IntegrityError):

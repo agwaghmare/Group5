@@ -1,5 +1,9 @@
 # Employee backend handoff
 
+For the merged customer + employee database setup, see [TIGER_SETUP.md](TIGER_SETUP.md).
+Customer DATABASE_URL and employee STAFF_DATABASE_URL serve separate schemas and
+login paths; their tokens are not interchangeable.
+
 This is the PNC employee prototype from Skill.md. It extends the existing FastAPI
 server without changing any frontend files. All staff data and policy are synthetic.
 The API never approves a real application, sends a message, or purchases anything.

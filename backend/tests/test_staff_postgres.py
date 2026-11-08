@@ -8,7 +8,6 @@ import os
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from app.staff.registry import ROLES
 from app.staff.seed import employees
 from app.staff.store import ident
 

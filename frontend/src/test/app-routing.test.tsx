@@ -28,4 +28,15 @@ describe("App routing", () => {
 
     expect(matches.at(-1)?.routeId).toBe("/learn");
   });
+
+  it("matches the Finance page for /finance", () => {
+    const router = createRouter({
+      routeTree,
+      context: { queryClient: new QueryClient() },
+    });
+
+    const matches = router.matchRoutes("/finance");
+
+    expect(matches.at(-1)?.routeId).toBe("/finance");
+  });
 });

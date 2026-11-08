@@ -15,7 +15,7 @@ from pathlib import Path
 from app.settings import BACKEND
 from app.staff.policy import ALLOWED, POLICY
 from app.staff.registry import FEATURES, ROLES
-from app.staff.seed import AS_OF, catalog, employees, prospects
+from app.staff.seed import catalog, employees, prospects
 
 TABLES = ("employees", "prospects", "credit_profiles", "protected", "links", "policies", "grants", "runs", "decisions",
           "cases", "case_events", "catalog", "benefit_rules", "redemptions", "audit", "sessions", "campaigns", "anomalies", "permissions")

@@ -1,0 +1,63 @@
+{
+  "label": "SYNTHETIC DEMO SUBSTITUTE - not the sponsor Lab_Package data",
+  "source_type": "synthetic_demo_substitute",
+  "snapshot_seed": 20261107,
+  "history_seed": 20261108,
+  "window_start": "2024-11-01",
+  "window_end": "2026-10-31",
+  "as_of_date": "2026-10-31",
+  "counts": {
+    "customers": 30,
+    "accounts": 196,
+    "transactions": 23718,
+    "statements": 4704,
+    "accounts_by_type": {
+      "auto_loan": 20,
+      "cd": 18,
+      "checking": 30,
+      "credit_card": 42,
+      "ira": 22,
+      "mortgage": 18,
+      "personal_loan": 16,
+      "savings": 30
+    }
+  },
+  "notes": [
+    "The sponsor transaction count (21,225) cannot be reproduced without the sponsor generator.",
+    "No merchant field exists; descriptions are generic category labels.",
+    "External cash-management transfers are artificial and excluded from income/spending.",
+    "customer archetypes below are generator internals for evaluation only; never model features."
+  ],
+  "generator_archetypes": {
+    "C001": "variable_income",
+    "C002": "saver",
+    "C003": "stable",
+    "C004": "stable",
+    "C005": "debt_heavy",
+    "C006": "stretched",
+    "C007": "stretched",
+    "C008": "stable",
+    "C009": "stable",
+    "C010": "variable_income",
+    "C011": "stretched",
+    "C012": "stable",
+    "C013": "debt_heavy",
+    "C014": "debt_heavy",
+    "C015": "stable",
+    "C016": "stretched",
+    "C017": "stretched",
+    "C018": "stable",
+    "C019": "debt_heavy",
+    "C020": "stable",
+    "C021": "saver",
+    "C022": "debt_heavy",
+    "C023": "stretched",
+    "C024": "saver",
+    "C025": "stable",
+    "C026": "saver",
+    "C027": "variable_income",
+    "C028": "stable",
+    "C029": "debt_heavy",
+    "C030": "variable_income"
+  }
+}
