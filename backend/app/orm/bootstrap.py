@@ -90,14 +90,35 @@ def import_tracker(db, path=TRACKER):
     return result
 
 
-def seed_identities(db):
+def role_catalog():
     roles = {"customer": ("Customer", ["home", "finance", "learn"], ["fin.*", "learn.*"])}
     roles.update({key: (value[0], visible(key), capabilities(key)) for key, value in ROLES.items()})
-    for key, (label, tabs, features) in roles.items():
+    return roles
+
+
+def sync_roles(db):
+    """Create missing roles and move credit/portfolio reviewers off Learn/Wilbur.
+
+    Other stored feature lists stay as written. A database grant that is narrower
+    than the code registry must keep failing closed.
+    """
+    for key, (label, tabs, features) in role_catalog().items():
         role = db.get(Role, key)
         if not role:
             db.add(Role(key=key, label=label, tabs=tabs, features=features))
+            continue
+        outdated = key in ("credit_analyst", "portfolio_manager") and (
+            list(role.tabs or []) != tabs or "learn.explain" in (role.features or []) or "learn" in (role.tabs or [])
+        )
+        if outdated:
+            role.label, role.tabs = label, tabs
+            # Retire Learn without restoring any other explicitly revoked grant.
+            role.features = [feature for feature in (role.features or []) if feature != "learn.explain"]
     db.flush()
+
+
+def seed_identities(db):
+    sync_roles(db)
     password = hash_password("demo" if demo_seed_enabled() else secrets.token_urlsafe(40))
     for employee in db.scalars(select(Employee)):
         if not db.get(User, "U-"+employee.id):

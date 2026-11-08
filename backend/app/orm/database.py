@@ -33,7 +33,7 @@ def engine_for(url):
     Base.metadata.create_all(engine)
     # SQL-level immutability complements API policy; raw UPDATE/DELETE is blocked.
     with engine.begin() as connection:
-        for table in ("audit", "runs", "decisions", "case_events", "redemptions", "policies", "benefit_rules", "catalog"):
+        for table in ("audit", "runs", "decisions", "case_events", "redemptions", "policies", "benefit_rules", "catalog", "portfolio_assessments", "portfolio_history", "portfolio_assignments"):
             for operation in ("UPDATE", "DELETE"):
                 connection.exec_driver_sql(f'CREATE TRIGGER IF NOT EXISTS "immutable_{table}_{operation}" BEFORE {operation} ON "{table}" BEGIN SELECT RAISE(ABORT, \'append-only\'); END')
         connection.exec_driver_sql("CREATE UNIQUE INDEX IF NOT EXISTS unique_redemption_request ON redemptions(owner, json_extract(payload, '$.request_id'))")

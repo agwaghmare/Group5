@@ -1,7 +1,7 @@
 """Employee API. See /docs and backend/EMPLOYEE_API.md for frontend integration."""
 import os
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.orm.identity import current_identity, find_user, issue_session, public_user
 from app.staff.policy import ALLOWED, OUTCOMES, evaluate
-from app.staff.registry import BANNER, FEATURES, ROLES, capabilities, visible
+from app.staff.registry import BANNER, capabilities, visible
 from app.staff.seed import business_date, tenure_months
 from app.staff.store import Store, digest, ident, now
 
@@ -35,11 +35,25 @@ class Run(Body):
     grant_id: str
 
 
+class FieldNote(Body):
+    label: str = Field(min_length=1, max_length=80)
+    value: str = Field(default="", max_length=500)
+
+
 class Decision(Body):
     run_id: str
     decision: Literal["Proceed to next step (simulated)", "Request more information", "Refer to senior review", "Decline as entered (with reason codes)"]
     rationale: str = Field(min_length=10, max_length=2000)
     override_reason: str | None = Field(default=None, min_length=10, max_length=2000)
+    fields: list[FieldNote] = Field(default_factory=list, max_length=24)
+
+
+class DecisionDraftIn(Body):
+    run_id: str
+    decision: str = Field(default="", max_length=200)
+    rationale: str = Field(default="", max_length=2000)
+    override_reason: str | None = Field(default=None, max_length=2000)
+    fields: list[FieldNote] = Field(default_factory=list, max_length=24)
 
 
 class CaseChange(Body):
@@ -137,14 +151,31 @@ def public_prospect(row):
             ("id", "application_ref", "assigned_to", "synthetic", "as_of", "employment_months", "delinquencies_12m", "bankruptcy_years_ago")}
 
 
-def run_for(store, key):
+def own_run(store, key):
     row = store.get("runs", key)
     if not row:
         fail(store, "Run unavailable for this analyst", key)
     if row["employee_id"] != store.employee["id"]:
         fail(store, "Research run belongs to another analyst", key)
+    return row
+
+
+def run_for(store, key):
+    row = own_run(store, key)
     grant_for(store, row["grant_id"], row["prospect_id"])
     return row
+
+
+def drop_draft(store, run_id):
+    for row in store.db.scalars(scoped_drafts(store)).all():
+        if row.payload.get("run_id") == run_id:
+            store.db.delete(row)
+    store.db.flush()
+
+
+def scoped_drafts(store):
+    from app.orm.authorization import scoped_query
+    return scoped_query(store, "decision_drafts")
 
 
 def benefit_rules(store):
@@ -306,20 +337,43 @@ def read_run(run_id: str, store=Depends(session)):
     return row
 
 
+@router.post("/decisions/drafts", status_code=201)
+def save_decision_draft(body: DecisionDraftIn, store=Depends(session)):
+    allow(store, "staff.decision", write=True)
+    run = own_run(store, body.run_id)
+    if any(r["run_id"] == run["id"] for r in store.all("decisions")):
+        raise HTTPException(409, "A human decision is already recorded for this run")
+    if body.decision and body.decision not in OUTCOMES.values():
+        raise HTTPException(422, "Choose a listed decision or leave it blank while the review is in progress")
+    existing = next((row for row in store.all("decision_drafts") if row["run_id"] == run["id"]), None)
+    row = {"id": existing["id"] if existing else ident("DRF"), **body.model_dump(),
+           "employee_id": store.employee["id"], "prospect_id": run["prospect_id"],
+           "status": "in_progress", "saved_at": now(), "synthetic": True, "sent_externally": False}
+    if existing:
+        store.update("decision_drafts", row)
+    else:
+        store.insert("decision_drafts", row, store.employee["id"])
+    store.audit("decision_draft_saved", row["id"], run_id=run["id"])
+    return row
+
+
 @router.post("/decisions", status_code=201)
 def decision(body: Decision, store=Depends(session)):
     allow(store, "staff.decision", write=True)
-    run = run_for(store, body.run_id)
+    # The purpose grant can expire while the analyst is still writing. The run
+    # already belongs to them, so recording does not require the grant to be open.
+    run = own_run(store, body.run_id)
     if any(r["run_id"] == run["id"] for r in store.all("decisions")):
         raise HTTPException(409, "A human decision is already recorded for this run")
     override = body.decision != OUTCOMES[run["outcome"]]
     if override and not body.override_reason:
         raise HTTPException(422, "Typed override reason is required")
     row = {"id": ident("DEC"), **body.model_dump(), "employee_id": store.employee["id"],
-           "override": override, "review_required": override, "recorded_at": now(),
+           "status": "recorded", "override": override, "review_required": override, "recorded_at": now(),
            "reason_codes": [r["reason_code"] for r in run["rules"] if r["status"] != "pass"],
            "synthetic": True, "sent_externally": False}
     store.insert("decisions", row, store.employee["id"])
+    drop_draft(store, run["id"])
     store.audit("human_decision", row["id"], override=override, grant_id=run["grant_id"])
     return row
 
@@ -328,10 +382,12 @@ def decision(body: Decision, store=Depends(session)):
 def decisions(store=Depends(session)):
     allow(store, "staff.decision")
     rows = store.all("decisions")
+    in_progress = []
     if store.employee["role"] == "credit_analyst":
         rows = [r for r in rows if r["employee_id"] == store.employee["id"]]
+        in_progress = store.all("decision_drafts")
     store.audit("decision_log_read")
-    return {"decisions": rows}
+    return {"decisions": rows, "in_progress": in_progress}
 
 
 @router.get("/cases")
@@ -487,6 +543,7 @@ def portfolio(store=Depends(session)):
                 "suppression_threshold": 5, "suppression_notice": "Groups smaller than five are suppressed.",
                 "sends": "simulated"}
     from sqlalchemy import func, select
+
     from app.orm.models import FinanceSnapshot
     latest = select(FinanceSnapshot.user_id, func.max(FinanceSnapshot.date).label("latest_date")).group_by(FinanceSnapshot.user_id).subquery()
     query = select(FinanceSnapshot).join(latest, (FinanceSnapshot.user_id == latest.c.user_id) & (FinanceSnapshot.date == latest.c.latest_date))
@@ -562,6 +619,8 @@ def anomalies(store=Depends(session)):
 @router.post("/assistant")
 def assistant(body: Ask, store=Depends(session)):
     allow(store, body.feature_id)
+    if body.agent == "wilbur" and store.employee["role"] in ("credit_analyst", "portfolio_manager"):
+        fail(store, "Wilbur is not part of this review workspace. Ask Bessie.", body.feature_id)
     if body.agent == "wilbur" and body.feature_id != "learn.explain":
         fail(store, "Wilbur is available through Explain This", body.feature_id)
     from app.agents.conversation import question_feature, welcome
@@ -595,7 +654,19 @@ def assistant(body: Ask, store=Depends(session)):
         summary = benefit_summary(store)
         evidence = {k: summary[k] for k in ("discount_rate_percent", "remaining_cap_cents", "rules")}
     elif feature == "staff.portfolio":
-        evidence = portfolio(store)
+        if body.resource_id:
+            from app.portfolio.service import assistant_evidence
+            try:
+                client_id = int(body.resource_id)
+            except ValueError:
+                raise HTTPException(422, "Select a valid portfolio client") from None
+            evidence = assistant_evidence(store, client_id)
+        else:
+            evidence = portfolio(store)
+            if store.user.role_key == "portfolio_manager":
+                from app.portfolio.service import activity
+                evidence["recent_activity"] = [{k: v for k, v in event.items() if k != "client_name"}
+                    for event in activity(store, limit=10)["events"]]
     elif feature == "staff.audit":
         evidence = {"events": audit(limit=20, store=store)["events"]}
     elif feature == "staff.fairness":
@@ -636,6 +707,9 @@ def assistant(body: Ask, store=Depends(session)):
         run_for(store, body.resource_id)
     if feature == "staff.cases" and body.resource_id:
         assigned(store, "cases", body.resource_id)
+    if feature == "staff.portfolio" and body.resource_id:
+        from app.portfolio.service import assigned_account
+        assigned_account(store, int(body.resource_id))
     store.audit("assistant_answer", body.resource_id or body.feature_id, feature=body.feature_id,
                 model=result["model"], prompt_version=result["prompt_version"])
     return {**result,

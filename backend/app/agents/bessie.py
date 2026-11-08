@@ -50,9 +50,12 @@ def facts_for(evidence):
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 if path.endswith("_cents"):
                     facts[key]["display"] = f"${value / 100:,.2f}"
-                elif path.endswith("_percent") or ratio:
-                    facts[key]["display"] = f"{value * 100 if ratio else value:g}%"
-                elif path.endswith(("new_payment", "revolving_balance", "requested_amount", "requested_limit")):
+                elif path.endswith("_percent") or ratio or ".allocations." in "." + path or ".risk_limits." in "." + path or path.endswith((
+                        "annualized_return", "total_return", "volatility", "max_drawdown", "risk_budget",
+                        "income_volatility", "debt_payment_to_income", "target_return")):
+                    facts[key]["display"] = f"{value if path.endswith('_percent') and not ratio else value * 100:g}%"
+                elif path.endswith(("new_payment", "revolving_balance", "requested_amount", "requested_limit",
+                                    "monthly_income", "monthly_surplus", "recurring_bills", "monthly_debt_payment")):
                     facts[key]["display"] = f"${value:,.2f}"
     visit(evidence, "")
     return facts
@@ -67,7 +70,7 @@ def validate_explanation(data, facts):
         referenced |= ids
         plain = FACT.sub("", value)
         if (re.search(r"\d|[$%]|\{\{|\}\}|https?://|<[^>]+>", plain)
-                or re.search(r"\b(I (?:have )?(?:approved|declined|sent|purchased|changed|recorded)|application is approved)\b", plain, re.I)):
+                or re.search(r"\b(I (?:have )?(?:approved|declined|sent|purchased|changed|recorded|rebalanced|executed|assigned)|application is approved)\b", plain, re.I)):
             raise ValueError("Unsupported model claim")
     if not referenced.issubset(facts) or not set(parsed.evidence_ids).issubset(facts):
         raise ValueError("Unknown evidence citation")
@@ -164,4 +167,4 @@ def explain(question, role, feature, evidence, agent="bessie"):
         raise AgentError(502, "Bessie's response did not pass evidence validation. No unsupported answer was returned.") from exc
     return {**result, "provider": "nvidia", "model": model, "status": "evidence_validated",
             "agent": "Wilbur" if agent == "wilbur" else "Bessie",
-            "prompt_version": "wilbur-v2" if agent == "wilbur" else "bessie-v3"}
+            "prompt_version": "wilbur-v2" if agent == "wilbur" else "bessie-v5"}

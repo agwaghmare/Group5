@@ -8,6 +8,8 @@ import {
   type CustomerSession,
 } from "@/lib/customer-session";
 import { setStoredCustomerId } from "@/lib/finance-api";
+import { rememberFifth } from "@/lib/fifth-page";
+import { useCenterDrag } from "@/lib/use-center-drag";
 import { TAB_LABEL, writeStaffToken, type StaffTab } from "@/lib/staff-api";
 
 const KEYWORDS = [
@@ -46,7 +48,12 @@ function Ring({
     return `M ${p(rOut, a0)} A ${rOut} ${rOut} 0 0 1 ${p(rOut, a1)} L ${p(rIn, a1)} A ${rIn} ${rIn} 0 0 0 ${p(rIn, a0)} Z`;
   };
   return (
-    <svg width={size} height={size} className={spinning ? "login-wheel" : undefined} aria-hidden="true">
+    <svg
+      width={size}
+      height={size}
+      className={`pointer-events-none ${spinning ? "login-wheel" : ""}`}
+      aria-hidden="true"
+    >
       {words.map((word, i) => {
         const mid = ((i * step - 90) * Math.PI) / 180;
         const tr = (rOut + rIn) / 2;
@@ -54,9 +61,16 @@ function Ring({
           <g
             key={`${word}-${i}`}
             className="login-slice"
-            style={{ ["--dx" as string]: `${Math.cos(mid) * 1500}px`, ["--dy" as string]: `${Math.sin(mid) * 1500}px` }}
+            style={{
+              ["--dx" as string]: `${Math.cos(mid) * 1500}px`,
+              ["--dy" as string]: `${Math.sin(mid) * 1500}px`,
+            }}
           >
-            <path d={arc(i)} className="fill-card stroke-border" strokeWidth={1.5} />
+            <path
+              d={arc(i)}
+              className="pointer-events-auto fill-card stroke-border"
+              strokeWidth={1.5}
+            />
             <text
               x={c + tr * Math.cos(mid)}
               y={c + tr * Math.sin(mid)}
@@ -78,22 +92,61 @@ function KeywordWheel({
   phase,
   words,
   anchor,
+  onCenter,
 }: {
   phase: WheelPhase;
   words: string[];
-  anchor: { x: number; y: number; size: number; rOut: number; rIn: number } | null;
+  anchor: {
+    x: number;
+    y: number;
+    size: number;
+    rOut: number;
+    rIn: number;
+  } | null;
+  onCenter: () => void;
 }) {
+  const drag = useCenterDrag(onCenter);
   if ((phase === "form" || phase === "in") && anchor) {
     return (
-      <div className={`login-form-wheel pointer-events-none ${phase === "in" ? "is-in" : ""}`} style={{ left: anchor.x, top: anchor.y }}>
-        <Ring words={words} size={anchor.size} rOut={anchor.rOut} rIn={anchor.rIn} />
+      <div
+        className={`login-form-wheel pointer-events-none ${phase === "in" ? "is-in" : ""}`}
+        style={{ left: anchor.x, top: anchor.y }}
+      >
+        <Ring
+          words={words}
+          size={anchor.size}
+          rOut={anchor.rOut}
+          rIn={anchor.rIn}
+        />
       </div>
     );
   }
   return (
-    <div className={`pointer-events-none absolute ${phase === "burst" ? "login-burst" : ""}`}>
-      <Ring words={KEYWORDS} size={920} rOut={448} rIn={360} spinning={phase === "idle"} />
-    </div>
+    <>
+      <div
+        aria-label="Drag the wheel to the center"
+        className={`absolute touch-none select-none ${phase === "burst" ? "login-burst pointer-events-none" : "cursor-grab active:cursor-grabbing"} ${drag.opening ? "pointer-events-none" : ""}`}
+        style={{
+          transform: `translate(${drag.offset.x}px, ${drag.offset.y}px)`,
+        }}
+        {...(phase === "idle" ? drag.handlers : {})}
+      >
+        <Ring
+          words={KEYWORDS}
+          size={920}
+          rOut={448}
+          rIn={360}
+          spinning={phase === "idle" && !drag.opening}
+        />
+      </div>
+      {drag.revealProps && (
+        <div
+          aria-hidden="true"
+          className="wheel-page-reveal"
+          {...drag.revealProps}
+        />
+      )}
+    </>
   );
 }
 
@@ -107,10 +160,22 @@ export function LoginPage() {
   const [docking, setDocking] = useState(false);
   const [phase, setPhase] = useState<WheelPhase>("idle");
   const [wheelWords, setWheelWords] = useState(KEYWORDS);
-  const [anchor, setAnchor] = useState<{ x: number; y: number; size: number; rOut: number; rIn: number } | null>(null);
+  const [anchor, setAnchor] = useState<{
+    x: number;
+    y: number;
+    size: number;
+    rOut: number;
+    rIn: number;
+  } | null>(null);
 
-  const dockThen = (kind: "customer" | "employee", words: string[], go: () => void) => {
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const dockThen = (
+    kind: "customer" | "employee",
+    words: string[],
+    go: () => void,
+  ) => {
+    const reduce = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
     if (reduce) {
       go();
       return;
@@ -148,10 +213,15 @@ export function LoginPage() {
   const enterStaff = (session: CustomerSession, tabs: string[]) => {
     writeCustomerSession(session);
     writeStaffToken(session.token ?? null);
-    const words = [...tabs.filter((tab) => tab !== "learn" && tab !== "activity"), "activity"].map(
-      (tab) => TAB_LABEL[tab as StaffTab] ?? tab,
+    const words = [
+      ...tabs.filter((tab) => tab !== "learn" && tab !== "activity"),
+      "activity",
+    ].map((tab) => TAB_LABEL[tab as StaffTab] ?? tab);
+    dockThen(
+      "employee",
+      words.length > 1 ? words : ["Home", "Research", "Benefits", "Activity"],
+      () => void navigate({ to: "/employee" }),
     );
-    dockThen("employee", words.length > 1 ? words : ["Home", "Research", "Benefits", "Activity"], () => void navigate({ to: "/employee" }));
   };
 
   const submit = (event: React.FormEvent) => {
@@ -221,11 +291,29 @@ export function LoginPage() {
 
   return (
     <div className="relative flex h-dvh items-center justify-center overflow-hidden bg-background">
-      <KeywordWheel phase={phase} words={wheelWords} anchor={anchor} />
-      <form onSubmit={submit} className={`login-card relative z-10 w-full max-w-sm rounded-[2rem] border border-border bg-background p-6 shadow-glow ${docking ? "is-docking" : ""}`}>
-        <p className="font-display text-2xl font-extrabold">FIN<span className="text-primary">PILOT</span></p>
-        <h1 className="mt-2 font-display text-3xl font-extrabold leading-none">Sign in</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Sign in to open the workspace assigned to your account.</p>
+      <KeywordWheel
+        phase={phase}
+        words={wheelWords}
+        anchor={anchor}
+        onCenter={() => {
+          rememberFifth("login");
+          void navigate({ to: "/page-five" });
+        }}
+      />
+      <form
+        onSubmit={submit}
+        className={`login-card relative z-10 w-full max-w-sm rounded-[2rem] border border-border bg-background p-6 shadow-glow ${docking ? "is-docking" : ""}`}
+      >
+        <p className="font-display text-2xl font-extrabold">
+          FIN<span className="text-primary">PILOT</span>
+        </p>
+        <h1 className="mt-2 font-display text-3xl font-extrabold leading-none">
+          Sign in
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Sign in to open the workspace assigned to your account. Drag the wheel
+          into the center to see the rule behind it.
+        </p>
         <label className="mt-4 block text-sm" htmlFor="login-email">
           Email
           <Input

@@ -459,7 +459,7 @@ function ResearchDesk({ onSignOut }: { onSignOut: () => void }) {
           </div>
         )}
         <p className="text-xs text-muted-foreground">
-          Synthetic data. Prototype policy rules, not bank policy. Recommendations support a human decision.
+          Synthetic data. Prototype policy rules, not bank policy.
         </p>
       </section>
     </div>

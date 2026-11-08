@@ -1,5 +1,8 @@
 # Employee backend handoff
 
+**Portfolio workspace:** see [PORTFOLIO_SETUP.md](PORTFOLIO_SETUP.md) for assigned clients, risk assessments and approved simulated rebalancing.
+
+
 **Current account/AI setup:** see [BESSIE_SETUP.md](BESSIE_SETUP.md). Normal sign-in now requires a provisioned email/password account. Demo login and auto-seeding are disabled; old sample logins below are historical. Bessie uses NVIDIA_API_KEY directly, without AGENT_PROVIDER. Existing financial data remains synthetic.
 
 **Current storage:** SQLAlchemy + local SQLite. See [SQLALCHEMY_SETUP.md](SQLALCHEMY_SETUP.md)

@@ -55,6 +55,8 @@ def scoped_query(store, table):
         return query
     if table == "decisions" and role in ("credit_analyst", "compliance_analyst"):
         return query.where(model.owner == eid) if role == "credit_analyst" else query
+    if table == "decision_drafts" and role == "credit_analyst":
+        return query.where(model.owner == eid)
     if table in ("cases", "case_events") and role == "service_specialist":
         return query.where(model.owner == eid)
     if table == "policies" and role in ("credit_analyst", "compliance_analyst", "auditor"):
@@ -76,6 +78,7 @@ def authorize_write(store, table, data, owner, update=False):
     if not store.user or table == "audit":
         return
     features = {"grants": "staff.creditresearch", "runs": "staff.creditresearch", "decisions": "staff.decision",
+                "decision_drafts": "staff.decision",
                 "cases": "staff.cases", "case_events": "staff.cases", "redemptions": "staff.benefits",
                 "catalog": "staff.benefits", "benefit_rules": "staff.benefits"}
     feature = features.get(table)

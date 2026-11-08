@@ -2,9 +2,9 @@
 import re
 
 HELP = {
-    "credit_analyst": "credit research, policy evidence and your employee benefits",
+    "credit_analyst": "credit research, in-progress decisions, policy evidence and your employee benefits",
     "service_specialist": "your assigned cases, consented case briefs and employee benefits",
-    "portfolio_manager": "portfolio summaries, research trends and employee benefits",
+    "portfolio_manager": "assigned client portfolios, risk assessments, simulated rebalance proposals and employee benefits",
     "marketing_analyst": "permitted campaign information and employee benefits",
     "compliance_analyst": "compliance reviews, audit evidence and employee benefits",
     "auditor": "read-only audit evidence and your employee benefits",
