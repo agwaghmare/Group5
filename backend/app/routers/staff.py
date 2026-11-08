@@ -662,11 +662,13 @@ def assistant(body: Ask, store=Depends(session)):
                 raise HTTPException(422, "Select a valid portfolio client") from None
             evidence = assistant_evidence(store, client_id)
         else:
-            evidence = portfolio(store)
             if store.user.role_key == "portfolio_manager":
-                from app.portfolio.service import activity
+                from app.portfolio.service import activity, portfolio_summary
+                evidence = portfolio_summary(store)
                 evidence["recent_activity"] = [{k: v for k, v in event.items() if k != "client_name"}
                     for event in activity(store, limit=10)["events"]]
+            else:
+                evidence = portfolio(store)
     elif feature == "staff.audit":
         evidence = {"events": audit(limit=20, store=store)["events"]}
     elif feature == "staff.fairness":

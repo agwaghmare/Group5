@@ -519,3 +519,37 @@ def activity(store, action="", limit=100):
             "detail": note, "fields": fields})
     store.audit("portfolio_activity_read")
     return {"events": events, "limit": limit, "scope": "own_actions_on_assigned_clients", "simulated": True}
+
+
+def portfolio_summary(store):
+    """Own book workflow counts; suppress risk/return means below five contributors."""
+    manager(store)
+    accounts = store.db.scalars(select(PortfolioAccount).join(PortfolioAssignment,
+        PortfolioAssignment.client_id == PortfolioAccount.client_id).where(
+        PortfolioAssignment.manager_id == store.user.employee_id)).all()
+    assessed = []
+    pending_clients = 0
+    for account in accounts:
+        latest = store.db.scalar(select(PortfolioAssessment).where(
+            PortfolioAssessment.client_id == account.client_id, PortfolioAssessment.revision == account.revision)
+            .order_by(PortfolioAssessment.assessed_at.desc()).limit(1))
+        if latest:
+            assessed.append(latest.evidence)
+        pending = store.db.scalar(select(RebalanceProposal.id).where(
+            RebalanceProposal.client_id == account.client_id,
+            RebalanceProposal.manager_id == store.user.employee_id,
+            RebalanceProposal.base_revision == account.revision,
+            RebalanceProposal.status == "proposed").limit(1))
+        pending_clients += int(pending is not None)
+    n = len(assessed)
+    store.audit("portfolio_summary_read")
+    return {"scope": "assigned_clients_only", "assigned_clients": len(accounts),
+        "assessed_clients": n, "needs_assessment": len(accounts) - n,
+        "above_risk_budget": sum("risk_above_budget" in e["flags"] for e in assessed),
+        "within_risk_budget": sum("risk_above_budget" not in e["flags"] for e in assessed),
+        "clients_with_pending_previews": pending_clients,
+        "mean_volatility": round(sum(e["metrics"]["volatility"] for e in assessed) / n, 8) if n >= 5 else None,
+        "mean_annualized_return": round(sum(e["metrics"]["annualized_return"] for e in assessed) / n, 8) if n >= 5 else None,
+        "suppression_threshold": 5, "aggregate_contributors": n,
+        "aggregate_note": "Risk and return averages require five current assessments, not just five assigned clients. Workflow counts cover only your authorized client list.",
+        "method": "Equal-weighted means of latest saved assessments for current portfolio revisions; synthetic historical modeled performance."}

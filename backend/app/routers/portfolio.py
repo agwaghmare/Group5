@@ -62,6 +62,11 @@ def activity(action: str = Query(default="", max_length=80), limit: int = Query(
     return service.activity(store, action=action, limit=limit)
 
 
+@router.get("/summary")
+def summary(store=Depends(session)):
+    return service.portfolio_summary(store)
+
+
 @router.get("/unassigned")
 def unassigned(search: str = Query(default="", max_length=100), store=Depends(session)):
     rows = service.client_queue(store, unassigned=True, search=search)
