@@ -326,6 +326,30 @@ def test_manager_activity_migration_does_not_restore_revoked_permissions(client)
     assert client.get("/staff/portfolio/activity", headers=h).status_code == 403
 
 
+def test_portfolio_summary_counts_assigned_clients_and_current_assessments(client):
+    h = login(client)
+    ids = [assign(client, h) for _ in range(5)]
+    before = client.get("/staff/portfolio/summary", headers=h).json()
+    assert before["assigned_clients"] == 5 and before["assessed_clients"] == 0
+    assert before["needs_assessment"] == 5 and before["mean_volatility"] is None
+    for cid in ids[:4]:
+        assert client.post(f"/staff/portfolio/clients/{cid}/assessments", headers=h, json={}).status_code == 201
+    partial = client.get("/staff/portfolio/summary", headers=h).json()
+    assert partial["assessed_clients"] == 4 and partial["mean_volatility"] is None
+    last = client.post(f"/staff/portfolio/clients/{ids[-1]}/assessments", headers=h, json={})
+    assert last.status_code == 201
+    complete = client.get("/staff/portfolio/summary", headers=h).json()
+    assert complete["assigned_clients"] == complete["assessed_clients"] == 5
+    assert complete["needs_assessment"] == 0 and complete["mean_volatility"] is not None
+    assert complete["above_risk_budget"] + complete["within_risk_budget"] == 5
+    # Repeated assessments count the client once, not every historical assessment row.
+    client.post(f"/staff/portfolio/clients/{ids[-1]}/assessments", headers=h, json={})
+    assert client.get("/staff/portfolio/summary", headers=h).json()["assessed_clients"] == 5
+    other = second_manager(client)
+    assert client.get("/staff/portfolio/summary", headers=other).json()["assigned_clients"] == 0
+    assert client.get("/staff/portfolio/summary", headers=login(client, "E004")).status_code == 403
+
+
 def test_portfolio_citations_render_rates_and_money_with_correct_units():
     facts = bessie.facts_for({"metrics": {"volatility": .12, "annualized_return": .045},
         "allocations": {"stocks": .6}, "risk_limits": {"investment_horizon": .06},
@@ -336,6 +360,15 @@ def test_portfolio_citations_render_rates_and_money_with_correct_units():
     assert displays["allocations.stocks"] == "60%"
     assert displays["risk_limits.investment_horizon"] == "6%"
     assert displays["financial_context.monthly_income"] == "$5,000.00"
+
+
+def test_summary_client_counts_are_not_formatted_as_risk_percentages():
+    facts = bessie.facts_for({"above_risk_budget": 2, "within_risk_budget": 3, "risk_budget": .06, "mean_volatility": .07})
+    by_path = {f["path"]: f for f in facts.values()}
+    assert "display" not in by_path["above_risk_budget"]
+    assert "display" not in by_path["within_risk_budget"]
+    assert by_path["risk_budget"]["display"] == "6%"
+    assert by_path["mean_volatility"]["display"] == "7%"
 
 
 def test_high_risk_mix_can_be_previewed_but_cannot_be_approved(client):

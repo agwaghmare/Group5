@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { CenterBrief } from "@/components/center-brief";
+import { CustomerPlans } from "@/components/customer-plans";
 import { LandingPage } from "@/components/finpilot-landing";
 import { RequireCustomer } from "@/components/require-customer";
 import { readFifth } from "@/lib/fifth-page";
@@ -65,10 +66,7 @@ function PageFive() {
           </div>
         )}
         {!origin && (
-          <CenterBrief
-            from="customer"
-            onReturn={() => setOrigin(wheelHome())}
-          />
+          <CustomerPlans onReturn={() => setOrigin(wheelHome())} />
         )}
         {origin && (
           <div

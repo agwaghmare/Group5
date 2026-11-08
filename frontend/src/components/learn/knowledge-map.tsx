@@ -19,7 +19,8 @@ function treeEdges(nodes: MapNode[], edges: MapEdge[]): MapEdge[] {
   const seen = new Set<string>();
   const kept: MapEdge[] = [];
   for (const edge of edges) {
-    if (!ids.has(edge.source) || !ids.has(edge.target) || seen.has(edge.target)) continue;
+    if (!ids.has(edge.source) || !ids.has(edge.target) || seen.has(edge.target))
+      continue;
     seen.add(edge.target);
     kept.push(edge);
   }
@@ -34,18 +35,45 @@ function forest(nodes: MapNode[], edges: MapEdge[]): Branch[] {
     kids.get(edge.source)!.push(edge.target);
     child.add(edge.target);
   }
-  const grow = (id: string): Branch => ({
-    id,
-    children: (kids.get(id) ?? []).map(grow),
-  });
-  return nodes.filter((node) => !child.has(node.id)).map((node) => grow(node.id));
+  const grow = (id: string, seen: Set<string>): Branch => {
+    if (seen.has(id)) return { id, children: [] };
+    const next = new Set(seen);
+    next.add(id);
+    return {
+      id,
+      children: (kids.get(id) ?? []).map((kid) => grow(kid, next)),
+    };
+  };
+  return nodes
+    .filter((node) => !child.has(node.id))
+    .map((node) => grow(node.id, new Set()));
+}
+
+function labelLines(title: string) {
+  const words = title.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (current && next.length > 22) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.slice(0, 3);
 }
 
 function layoutTree(nodes: MapNode[], edges: MapEdge[]) {
   const roots = forest(nodes, edges);
   const widthOf = (branch: Branch): number => {
     if (branch.children.length === 0) return BOX_W;
-    const inner = branch.children.reduce((sum, child) => sum + widthOf(child), 0);
+    const inner = branch.children.reduce(
+      (sum, child) => sum + widthOf(child),
+      0,
+    );
     return inner + GAP_X * (branch.children.length - 1);
   };
   const pos = new Map<string, Box>();
@@ -105,10 +133,15 @@ export function KnowledgeMapView({
   selected?: string | null;
   onSelect: (node: MapNode) => void;
 }) {
-  const layout = useMemo(() => layoutTree(data.nodes, data.edges), [data.nodes, data.edges]);
+  const layout = useMemo(
+    () => layoutTree(data.nodes, data.edges),
+    [data.nodes, data.edges],
+  );
   const [query, setQuery] = useState("");
   const [camera, setCamera] = useState({ x: 0, y: 0, k: 1 });
-  const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null);
+  const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(
+    null,
+  );
   const frame = useRef<HTMLDivElement>(null);
   const cameraRef = useRef(camera);
   const worldRef = useRef({ w: layout.worldW, h: layout.worldH });
@@ -124,15 +157,28 @@ export function KnowledgeMapView({
       const rect = node.getBoundingClientRect();
       const current = cameraRef.current;
       const world = worldRef.current;
-      const next = Math.min(1.8, Math.max(0.55, current.k * (event.deltaY > 0 ? 0.92 : 1.08)));
+      const next = Math.min(
+        1.8,
+        Math.max(0.55, current.k * (event.deltaY > 0 ? 0.92 : 1.08)),
+      );
       const px = ((event.clientX - rect.left) / rect.width) * world.w;
       const py = ((event.clientY - rect.top) / rect.height) * world.h;
-      setCamera({ k: next, x: px - worldX(px, current, next), y: py - worldY(py, current, next) });
+      setCamera({
+        k: next,
+        x: px - worldX(px, current, next),
+        y: py - worldY(py, current, next),
+      });
     };
-    const worldX = (px: number, current: { x: number; k: number }, next: number) =>
-      ((px - current.x) / current.k) * next;
-    const worldY = (py: number, current: { y: number; k: number }, next: number) =>
-      ((py - current.y) / current.k) * next;
+    const worldX = (
+      px: number,
+      current: { x: number; k: number },
+      next: number,
+    ) => ((px - current.x) / current.k) * next;
+    const worldY = (
+      py: number,
+      current: { y: number; k: number },
+      next: number,
+    ) => ((py - current.y) / current.k) * next;
     node.addEventListener("wheel", onWheel, { passive: false });
     return () => node.removeEventListener("wheel", onWheel);
   }, []);
@@ -155,20 +201,34 @@ export function KnowledgeMapView({
         ref={frame}
         className="relative h-[540px] cursor-grab touch-none active:cursor-grabbing"
         onPointerDown={(event) => {
-          if ((event.target as Element).closest("[data-node]")) return;
-          drag.current = { x: event.clientX, y: event.clientY, cx: camera.x, cy: camera.y };
-          (event.currentTarget as HTMLDivElement).setPointerCapture(event.pointerId);
+          const target = event.target as Element | null;
+          if (target?.closest?.("[data-node]")) return;
+          drag.current = {
+            x: event.clientX,
+            y: event.clientY,
+            cx: camera.x,
+            cy: camera.y,
+          };
+          try {
+            (event.currentTarget as HTMLDivElement).setPointerCapture(
+              event.pointerId,
+            );
+          } catch {
+            /* The pointer can end before capture is attached. */
+          }
         }}
         onPointerMove={(event) => {
-          if (!drag.current || !frame.current) return;
-          const rect = frame.current.getBoundingClientRect();
-          const dx = ((event.clientX - drag.current.x) / rect.width) * layout.worldW;
-          const dy = ((event.clientY - drag.current.y) / rect.height) * layout.worldH;
-          setCamera((current) => ({
-            ...current,
-            x: drag.current!.cx + dx,
-            y: drag.current!.cy + dy,
-          }));
+          const start = drag.current;
+          const node = frame.current;
+          if (!start || !node) return;
+          const rect = node.getBoundingClientRect();
+          if (rect.width < 1 || rect.height < 1) return;
+          const dx = ((event.clientX - start.x) / rect.width) * layout.worldW;
+          const dy = ((event.clientY - start.y) / rect.height) * layout.worldH;
+          const x = start.cx + dx;
+          const y = start.cy + dy;
+          if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+          setCamera((current) => ({ ...current, x, y }));
         }}
         onPointerUp={() => {
           drag.current = null;
@@ -181,7 +241,9 @@ export function KnowledgeMapView({
           role="img"
           aria-label="Knowledge map arranged as a top-down tree"
         >
-          <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.k})`}>
+          <g
+            transform={`translate(${camera.x} ${camera.y}) scale(${camera.k})`}
+          >
             {layout.edges.map((edge) => {
               const from = layout.pos.get(edge.source);
               const to = layout.pos.get(edge.target);
@@ -191,7 +253,8 @@ export function KnowledgeMapView({
               const x2 = to.x + BOX_W / 2;
               const y2 = to.y;
               const mid = y1 + (y2 - y1) / 2;
-              const active = edge.source === selected || edge.target === selected;
+              const active =
+                edge.source === selected || edge.target === selected;
               return (
                 <path
                   key={`${edge.source}->${edge.target}`}
@@ -205,7 +268,8 @@ export function KnowledgeMapView({
             {data.nodes.map((node) => {
               const box = layout.pos.get(node.id);
               if (!box) return null;
-              const match = !needle || node.title.toLowerCase().includes(needle);
+              const match =
+                !needle || node.title.toLowerCase().includes(needle);
               const isSel = node.id === selected;
               return (
                 <g
@@ -234,17 +298,23 @@ export function KnowledgeMapView({
                     stroke={isSel ? "#fb7185" : "#3d4658"}
                     strokeWidth={isSel ? 2.4 : 1.2}
                   />
-                  <foreignObject x={box.x + 10} y={box.y + 8} width={BOX_W - 20} height={BOX_H - 16}>
-                    <div className="flex h-full w-full items-center justify-center overflow-hidden text-center">
-                      <span
-                        className={`line-clamp-3 break-words text-[12px] leading-snug ${
-                          node.status === "locked" ? "text-[#9aa3b5]" : "text-[#f4f7fb]"
-                        }`}
+                  <text
+                    x={box.x + BOX_W / 2}
+                    y={box.y + 22}
+                    textAnchor="middle"
+                    fill={node.status === "locked" ? "#9aa3b5" : "#f4f7fb"}
+                    fontSize="12"
+                  >
+                    {labelLines(node.title).map((line, index) => (
+                      <tspan
+                        key={`${index}-${line}`}
+                        x={box.x + BOX_W / 2}
+                        dy={index === 0 ? 0 : 14}
                       >
-                        {node.title}
-                      </span>
-                    </div>
-                  </foreignObject>
+                        {line}
+                      </tspan>
+                    ))}
+                  </text>
                 </g>
               );
             })}
@@ -252,8 +322,8 @@ export function KnowledgeMapView({
         </svg>
       </div>
       <p className="border-t border-white/10 px-4 py-2 text-xs text-muted-foreground">
-        Pan and zoom to explore. Select a concept on the graph or use the list below.{" "}
-        {data.nodes.length} concepts
+        Pan and zoom to explore. Select a concept on the graph or use the list
+        below. {data.nodes.length} concepts
       </p>
     </div>
   );

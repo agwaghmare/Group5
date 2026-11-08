@@ -31,6 +31,7 @@ from app.solana.limits import (
 )
 
 LAMPORTS_PER_SOL = 1_000_000_000
+MAX_TOKEN_UNITS = 2**64 - 1
 MINT_SIZE = 82
 TOKEN_PROGRAM_ID = Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
 ASSOCIATED_TOKEN_PROGRAM_ID = Pubkey.from_string("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
@@ -299,6 +300,28 @@ def _associated_token_address(owner: Pubkey, mint: Pubkey) -> Pubkey:
     )[0]
 
 
+def raw_units(amount: float, decimals: int) -> int:
+    """Smallest token units. Solana stores this as a 64-bit whole number."""
+    if decimals < 0 or decimals > 18:
+        raise SolanaError("Decimals must be 0–18")
+    if amount <= 0:
+        raise SolanaError("Amount must be positive")
+    text = format(amount, "f")
+    whole, _, frac = text.partition(".")
+    frac = (frac[:decimals]).ljust(decimals, "0")
+    try:
+        units = int(whole) * (10**decimals) + (int(frac) if frac else 0)
+    except ValueError as exc:
+        raise SolanaError("Amount must be a plain number") from exc
+    if units <= 0 or units > MAX_TOKEN_UNITS:
+        largest = MAX_TOKEN_UNITS / (10**decimals)
+        raise SolanaError(
+            f"That amount does not fit in a Solana coin with {decimals} decimals. "
+            f"Use at most {largest:,.0f}, or fewer decimals."
+        )
+    return units
+
+
 def _initialize_mint_ix(mint: Pubkey, decimals: int, authority: Pubkey) -> Instruction:
     data = bytes([20, decimals]) + bytes(authority) + bytes([0])
     return Instruction(TOKEN_PROGRAM_ID, data, [AccountMeta(mint, is_signer=False, is_writable=True)])
@@ -361,7 +384,7 @@ def create_token(user_id: str, name: str, symbol: str, decimals: int, initial_su
     rent = rpc("getMinimumBalanceForRentExemption", [MINT_SIZE])
     lamports = int(rent if isinstance(rent, int) else (rent or 0))
     ata = _associated_token_address(payer.pubkey(), mint.pubkey())
-    raw_supply = int(round(initial_supply * (10 ** decimals)))
+    raw_supply = raw_units(initial_supply, decimals)
     ixs = [
         create_account(
             CreateAccountParams(
@@ -410,7 +433,7 @@ def transfer_token(user_id: str, mint_address: str, recipient: str, amount: floa
         raise SolanaError("Invalid mint or recipient address") from exc
     source = _associated_token_address(payer.pubkey(), mint)
     dest = _associated_token_address(dest_owner, mint)
-    raw = int(round(amount * (10 ** decimals)))
+    raw = raw_units(amount, decimals)
     ixs = [_create_ata_ix(payer.pubkey(), dest_owner, mint), _transfer_ix(source, dest, payer.pubkey(), raw)]
     tx = Transaction.new_signed_with_payer(ixs, payer.pubkey(), [payer], _blockhash())
     signature = _send(tx)

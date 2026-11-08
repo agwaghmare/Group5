@@ -192,3 +192,15 @@ Activity verification: 123 backend tests passed (195 archived tests skipped),
 all 28 frontend tests passed, and TypeScript, backend/new-component lint and
 production build passed. Tests cover another manager's event isolation, event
 filtering, removal of Wilbur access and preserving revoked DB grants during migration.
+
+Assigned-book summary: the risk manager's overview now uses
+`GET /staff/portfolio/summary`, not the legacy tracker-wide credit research funnel.
+Assigned clients, current assessments, clients needing assessment, risk-budget
+status and pending-preview client counts are scoped to that manager. Operational
+counts are visible for the manager's authorized clients. Mean volatility and mean
+modeled annual return require at least five distinct clients with saved assessments
+for their current portfolio revisions. Re-running one client does not increase
+that contributor count. Values are equal-weighted means, not book-level investment
+performance. Assignment, profile, assessment and rebalance mutations invalidate
+summary and Activity caches; Bessie's no-client portfolio context uses this same
+scoped summary. Marketing's existing aggregate-only API remains unchanged.

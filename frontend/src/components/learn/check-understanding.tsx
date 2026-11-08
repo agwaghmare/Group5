@@ -105,10 +105,10 @@ export function CheckUnderstanding({
       </div>
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
       {result?.reward && <p role="status" className="mt-4 rounded-xl bg-primary/10 p-3 text-sm">
-        {result.reward.awarded > 0 ? `You earned ${result.reward.awarded.toFixed(1)} PNC coins!`
+        {result.reward.awarded > 0 ? `You earned ${result.reward.awarded.toFixed(1)} FIN coins!`
           : result.reward.already_earned ? "You already earned this lesson's reward. Keep practicing!"
-          : "Score at least 80% to earn this lesson's 0.1 PNC coins. Try again!"}
-        {" "}Balance: {result.reward.balance.toFixed(1)} PNC coins.
+          : "Score at least 80% to earn this lesson's 0.1 FIN coins. Try again!"}
+        {" "}Balance: {result.reward.balance.toFixed(1)} FIN coins.
       </p>}
       <div className="mt-5 flex items-center gap-4">
         {!result ? (

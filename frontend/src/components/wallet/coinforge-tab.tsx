@@ -41,8 +41,15 @@ export function CoinForgeTab() {
   const handleCreate = async () => {
     if (!wallet.connected || !wallet.publicKey) { setCreateError("Connect your test wallet first"); return; }
     if (!name.trim() || !symbol.trim()) { setCreateError("Name and symbol are required"); return; }
-    if (!Number.isInteger(Number(decimals)) || Number(decimals) < 0 || Number(decimals) > 18) { setCreateError("Decimals must be 0–18"); return; }
-    if (!Number.isFinite(Number(supply)) || Number(supply) <= 0) { setCreateError("Supply must be positive"); return; }
+    const places = Number(decimals);
+    const minted = Number(supply);
+    if (!Number.isInteger(places) || places < 0 || places > 18) { setCreateError("Decimals must be 0–18"); return; }
+    if (!Number.isFinite(minted) || minted <= 0) { setCreateError("Supply must be positive"); return; }
+    if (minted * 10 ** places > 2 ** 64 - 1) {
+      const largest = Math.floor((2 ** 64 - 1) / 10 ** places);
+      setCreateError(`That supply does not fit in a Solana coin with ${places} decimals. Use at most ${largest.toLocaleString()}, or fewer decimals.`);
+      return;
+    }
 
     setCreating(true); setCreateError(null); setCreateResult(null);
     try {

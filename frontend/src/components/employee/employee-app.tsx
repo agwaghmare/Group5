@@ -2,6 +2,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { writeCustomerSession } from "@/lib/customer-session";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PortfolioActivity } from "@/components/employee/portfolio-activity";
+import { PortfolioWorkspace } from "@/components/employee/portfolio-workspace";
 import { AssistantRail as BessieRail } from "@/components/employee/assistant-rail";
 import { FinpilotHeader } from "@/components/finpilot-header";
 import { Button } from "@/components/ui/button";
@@ -349,13 +351,19 @@ export function EmployeeApp() {
                       onContext={setBessie}
                     />
                   )}
-                  {tab === "portfolio" && (
-                    <PortfolioPanel
-                      features={session.data.features}
-                      focused={activeTab === "portfolio"}
-                      onContext={setBessie}
-                    />
-                  )}
+                  {tab === "portfolio" &&
+                    (session.data.employee.role === "portfolio_manager" ? (
+                      <PortfolioWorkspace
+                        focused={activeTab === "portfolio"}
+                        onContext={setBessie}
+                      />
+                    ) : (
+                      <PortfolioPanel
+                        features={session.data.features}
+                        focused={activeTab === "portfolio"}
+                        onContext={setBessie}
+                      />
+                    ))}
                   {tab === "compliance" && (
                     <CompliancePanel
                       features={session.data.features}
@@ -372,9 +380,12 @@ export function EmployeeApp() {
                       onContext={setBessie}
                     />
                   )}
-                  {tab === "activity" && (
-                    <ActivityPanel features={session.data.features} />
-                  )}
+                  {tab === "activity" &&
+                    (session.data.employee.role === "portfolio_manager" ? (
+                      <PortfolioActivity />
+                    ) : (
+                      <ActivityPanel features={session.data.features} />
+                    ))}
                   {tab === "learn" && (
                     <div className="max-w-2xl space-y-4">
                       <h1 className="font-display text-4xl font-extrabold">
@@ -422,7 +433,9 @@ export function EmployeeApp() {
                   ? "staff.fairness"
                   : "staff.audit"
                 : activeTab === "activity"
-                  ? "staff.decision"
+                  ? employee?.role === "portfolio_manager"
+                    ? "staff.portfolio"
+                    : "staff.decision"
                   : activeTab === "learn"
                     ? "staff.access"
                     : activeTab === "research" ||
@@ -434,12 +447,16 @@ export function EmployeeApp() {
                         : "staff.access"
             }
             resourceId={
-              activeTab === "research" || activeTab === "cases"
+              activeTab === "research" ||
+              activeTab === "cases" ||
+              activeTab === "portfolio"
                 ? bessie.resourceId
                 : undefined
             }
             hint={
-              activeTab === "home" || activeTab === "learn"
+              activeTab === "activity" && employee?.role === "portfolio_manager"
+                ? "Ask Bessie about your portfolio review activity."
+                : activeTab === "home" || activeTab === "learn"
                 ? "Ask about your workspace or choose a record to discuss."
                 : bessie.hint
             }
@@ -535,7 +552,9 @@ function HomePanel({
                   {
                     label: "Review activity",
                     detail:
-                      "Saved decisions and recorded outcomes on this desk",
+                      home.data?.role === "portfolio_manager"
+                        ? "Client assignments, risk assessments and rebalance history"
+                        : "Saved decisions and recorded outcomes on this desk",
                     onClick: () => onOpen("activity"),
                   },
                 ]

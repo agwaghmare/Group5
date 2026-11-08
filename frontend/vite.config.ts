@@ -25,10 +25,10 @@ function polyfillNodeBuffer() {
 }
 
 // Backends run separately. In dev the browser talks to one Vite origin; paths are proxied.
-//   /api/v1/*  → PNC customer + auth API (override with PNC_API_URL; default :8002)
-//   /api/*     → Learn API on the same server (override with LEARN_API_URL; default :8002; /api prefix stripped)
-const pncApi = process.env["PNC_API_URL"] ?? "http://127.0.0.1:8002";
-const learnApi = process.env["LEARN_API_URL"] ?? "http://127.0.0.1:8002";
+//   /api/v1/*  → PNC customer + auth API (override with PNC_API_URL; default :8010)
+//   /api/*     → Learn API on the same server (override with LEARN_API_URL; default :8010; /api prefix stripped)
+const pncApi = process.env["PNC_API_URL"] ?? "http://127.0.0.1:8010";
+const learnApi = process.env["LEARN_API_URL"] ?? "http://127.0.0.1:8010";
 
 export default defineConfig({
   plugins: [polyfillNodeBuffer()],

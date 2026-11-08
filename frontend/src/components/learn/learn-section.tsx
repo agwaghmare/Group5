@@ -34,7 +34,7 @@ import {
 export type LearnView = "lessons" | "map" | "explain";
 
 const LEARN_GUIDE: Record<LearnView, string> = {
-  lessons: "Build confidence with short finance lessons, worked examples and quick knowledge checks. Explore linked readings and videos, ask Wilbur about unfamiliar ideas, and earn test PNC coins when you pass a lesson's quiz.",
+  lessons: "Build confidence with short finance lessons, worked examples and quick knowledge checks. Explore linked readings and videos, ask Wilbur about unfamiliar ideas, and earn test FIN coins when you pass a lesson's quiz.",
   map: "See how finance topics connect and which lessons build on earlier ones. Select a topic to find a useful next lesson, then open it when you are ready to learn more.",
   explain: "Ask Wilbur to explain a finance term or help you understand your recorded financial numbers. For topics beyond the lessons, he can look up references and show source links. Type a question or use voice for a spoken explanation.",
 };

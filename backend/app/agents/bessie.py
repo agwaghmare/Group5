@@ -50,8 +50,8 @@ def facts_for(evidence):
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 if path.endswith("_cents"):
                     facts[key]["display"] = f"${value / 100:,.2f}"
-                elif path.endswith("_percent") or ratio or ".allocations." in "." + path or ".risk_limits." in "." + path or path.endswith((
-                        "annualized_return", "total_return", "volatility", "max_drawdown", "risk_budget",
+                elif path.endswith("_percent") or ratio or ".allocations." in "." + path or ".risk_limits." in "." + path or path.rsplit(".", 1)[-1] == "risk_budget" or path.endswith((
+                        "annualized_return", "total_return", "volatility", "max_drawdown",
                         "income_volatility", "debt_payment_to_income", "target_return")):
                     facts[key]["display"] = f"{value if path.endswith('_percent') and not ratio else value * 100:g}%"
                 elif path.endswith(("new_payment", "revolving_balance", "requested_amount", "requested_limit",

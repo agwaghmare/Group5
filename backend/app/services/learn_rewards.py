@@ -10,7 +10,7 @@ PASS_SCORE = 0.8
 def summary(store):
     grants = store.db.scalars(select(LearnReward).where(LearnReward.user_id == store.user.id)
                              .order_by(LearnReward.earned_at.desc())).all()
-    return {"currency": "PNC coins", "balance": sum(g.amount_tenths for g in grants) / 10,
+    return {"currency": "FIN coins", "balance": sum(g.amount_tenths for g in grants) / 10,
             "per_lesson": 0.1, "pass_score": PASS_SCORE,
             "description": "In-app learning points. No cash value or SOL transfer.",
             "earned_lessons": [{"lesson_id": g.lesson_id, "amount": g.amount_tenths / 10,
