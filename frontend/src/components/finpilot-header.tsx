@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useCustomerSession, writeCustomerSession } from "@/lib/customer-session";
+import { writeStaffToken } from "@/lib/staff-api";
 
 export function FinpilotHeader({
   miniWheel = false,
@@ -51,7 +52,10 @@ export function FinpilotHeader({
             <Button variant="ghost" aria-label="Profile" className="outline-none"><UserCircle /><span className="hidden sm:inline">Profile</span></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>{customer?.email ?? role ?? "Not signed in"}</DropdownMenuLabel>
+            <DropdownMenuLabel>
+              <span className="block">{customer?.displayName ?? customer?.email ?? role ?? "Not signed in"}</span>
+              {customer?.roleLabel && <span className="block text-xs font-normal text-muted-foreground">{customer.roleLabel}</span>}
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => void navigate({ to: "/employee" })}>Employee view</DropdownMenuItem>
             {customer && <DropdownMenuItem onSelect={() => void navigate({ to: "/" })}>Customer view</DropdownMenuItem>}
@@ -60,6 +64,7 @@ export function FinpilotHeader({
               <DropdownMenuItem
                 onSelect={() => {
                   writeCustomerSession(null);
+                  writeStaffToken(null);
                   void navigate({ to: "/login" });
                 }}
               >

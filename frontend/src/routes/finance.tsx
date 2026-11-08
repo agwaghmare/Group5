@@ -29,12 +29,12 @@ export const Route = createFileRoute("/finance")({
       { title: "Finance — FINPILOT" },
       {
         name: "description",
-        content: "Your money at a glance — safe spend, accounts, bills, goals and financial health.",
+        content: "Balances, bills, savings, and debt from the synthetic finance tracker.",
       },
       { property: "og:title", content: "Finance — FINPILOT" },
       {
         property: "og:description",
-        content: "Your money at a glance — safe spend, accounts, bills, goals and financial health.",
+        content: "Balances, bills, savings, and debt from the synthetic finance tracker.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -61,7 +61,7 @@ function FinancePage() {
           Make money make sense.
         </h1>
         <p className="mt-3 max-w-xl text-muted-foreground">
-          A complete view of your money, backed by transparent calculations.
+          Monthly observations from the synthetic tracker for the account you signed in with.
         </p>
         <div className="mt-8 min-h-0 flex-1">
           <FinanceSection

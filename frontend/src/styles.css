@@ -90,13 +90,22 @@
 
 .fifth-page-enter { animation: fifth-page-enter 350ms ease-out both; }
 
-.wheel-page-return {
-  animation: wheel-page-return 700ms cubic-bezier(0.65, 0, 0.25, 1) both;
+.wheel-page-return-ring {
+  position: fixed;
+  z-index: 60;
+  width: 300vmax;
+  height: 300vmax;
+  border-radius: 50%;
+  background: var(--background);
+  border: 4px solid var(--primary);
+  box-shadow: 0 0 90px 16px color-mix(in oklab, var(--primary) 70%, transparent);
+  pointer-events: none;
+  animation: wheel-page-return 1100ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
 }
 
 @keyframes wheel-page-return {
-  0% { clip-path: circle(150vmax at 50% 50%); }
-  80%, 100% { clip-path: circle(0 at 50% 50%); }
+  0% { transform: translate(-50%, -50%) scale(1); }
+  100% { transform: translate(-50%, -50%) scale(0); }
 }
 
 @keyframes wheel-implode {
@@ -118,15 +127,19 @@
 }
 
 .login-wheel-dock.is-docking {
-  transition: transform 720ms cubic-bezier(0.65, 0, 0.25, 1);
+  transition: transform 1400ms cubic-bezier(0.16, 1, 0.3, 1);
   transform: translate(var(--dock-x), var(--dock-y)) scale(var(--dock-scale));
   z-index: 30;
+}
+
+.login-wheel-dock.is-docking .login-wheel {
+  animation-play-state: paused;
 }
 
 .login-card.is-docking {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 280ms ease;
+  transition: opacity 420ms ease;
 }
 
 @keyframes login-wheel-spin {
@@ -134,5 +147,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wheel-implode, .wheel-page-reveal, .wheel-page-return, .fifth-page-enter, .login-wheel { animation-duration: 1ms; }
+  .wheel-implode, .wheel-page-reveal, .wheel-page-return-ring, .fifth-page-enter, .login-wheel { animation-duration: 1ms; }
+  .login-wheel-dock.is-docking, .login-card.is-docking { transition-duration: 1ms; }
 }
