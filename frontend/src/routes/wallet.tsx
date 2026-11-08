@@ -121,11 +121,11 @@ function WalletPage() {
           </h1>
           <p className="mt-3 max-w-xl text-muted-foreground">
             {view === "milestones" &&
-              "Level up your financial life. Complete milestones, earn XP and FinPilot Credits, and unlock rewards."}
+              "Track progress toward financial milestones, build habits and earn XP and FinPilot Credits. Your rewards and achievements make progress easier to see."}
             {view === "payments" &&
-              "Send test SOL or split a bill. To create and pay with your own test currency, open CoinForge."}
+              "Practice sending test SOL to another wallet or calculate each person's share of a bill. The connected test network shows where transfers happen. Open CoinForge to create your own test currency."}
             {view === "coinforge" &&
-              "Create your own test currency and pay another Solana address. Your coins and transfer history are saved locally."}
+              "Create a test currency with your own name, symbol and supply, then try sending it to another Solana address. Your coins and transfer history are saved locally, and test coins have no real dollar value."}
           </p>
 
           <div className="mt-6 flex flex-wrap gap-2">

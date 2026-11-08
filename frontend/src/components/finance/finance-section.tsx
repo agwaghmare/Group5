@@ -34,6 +34,17 @@ const AMELIA_SKILLS: { id: string; label: string }[] = [
   { id: "fin.coach", label: "Coach" },
 ];
 
+const AMELIA_GUIDE: Record<string, string> = {
+  "fin.profile": "Picture gives a plain-word overview of the section you are viewing.",
+  "fin.xray": "X-Ray explains financial health indicators such as emergency coverage, credit use and debt payment coverage.",
+  "fin.futureyou": "FutureYou explains the recorded projections and the assumptions behind a possible future outcome.",
+  "fin.moneymission": "Plan helps you understand savings goals and the cash left after known obligations.",
+  "fin.immune": "Shock helps you understand the reserves and income you could rely on if your finances are disrupted.",
+  "fin.moneyleaks": "Leaks helps you spot regular costs and spending differences worth reviewing.",
+  "fin.debt": "Debt explains borrowing costs, payments and the recorded debt picture.",
+  "fin.coach": "Coach answers questions about the current section and helps you identify a useful next step.",
+};
+
 const NAV: { id: FinanceView; label: string }[] = [
   { id: "money", label: "My Money" },
   { id: "bills", label: "Bills" },
@@ -42,6 +53,15 @@ const NAV: { id: FinanceView; label: string }[] = [
   { id: "whatif", label: "What If" },
   { id: "investments", label: "Investments" },
 ];
+
+const SECTION_GUIDE: Record<FinanceView, string> = {
+  money: "See what you have in checking, savings and investments, alongside the cash available to use. Move the savings slider to preview setting money aside and see how that changes your available cash and outlook.",
+  bills: "Understand how much of your income goes toward regular bills, subscriptions and minimum debt payments. Try trimming expenses to see what could remain each month; subscriptions are reduced first.",
+  goals: "See how much emergency savings you have and choose the cushion you want to build. Adjust your monthly contribution to estimate the amount you still need and how long reaching your goal could take.",
+  health: "Understand what you owe, the cost of interest and how much of your income goes toward debt payments. Change the loan settings or add extra payments to explore the effect on total interest, payoff time and money left each month.",
+  whatif: "Explore how an income drop, higher living costs, an emergency expense or a delayed payday could affect your cash. Compare the scenario with your starting outlook to spot possible shortfalls before deciding on a next step.",
+  investments: "Understand your investment mix, its modeled ups and downs and how it fits your goals. Explore a future-value scenario, adjust your risk profile and compare rebalancing suggestions before considering a change.",
+};
 
 export function FinanceSection({
   view,
@@ -74,6 +94,10 @@ export function FinanceSection({
           Synthetic tracker{tracker.data ? ` · ${tracker.data.customer_id}` : ""}
         </span>
       </div>
+
+      <p className="mb-6 max-w-3xl text-sm leading-relaxed text-muted-foreground" aria-label="About this finance section">
+        {SECTION_GUIDE[view]} Ask Amelia for a quick review to hear what the recorded numbers mean.
+      </p>
 
       {session?.isStaff && (
         <p className="text-sm text-muted-foreground">This desk is for a customer tracker account. Sign in with a customer email to see balances.</p>
@@ -187,6 +211,7 @@ export function AmeliaRail({
             className={`rounded-full border px-3 py-1 text-left text-xs ${skill === item.id ? "border-primary text-primary" : "border-border hover:border-primary"}`}
             disabled={pending}
             aria-pressed={skill === item.id}
+            title={AMELIA_GUIDE[item.id]}
             onClick={() => {
               setSkill(item.id);
               setQuestion(presetQuestions[item.id] ?? "");
@@ -197,6 +222,7 @@ export function AmeliaRail({
           </button>
         ))}
       </div>
+      <p className="mt-2 text-xs text-muted-foreground">{AMELIA_GUIDE[skill]}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {prompts.map((prompt) => (
           <button
@@ -312,7 +338,7 @@ function BillsView({ latest, history }: { latest: Snapshot; history: Snapshot[] 
     <Desk
       eyebrow="Committed this month"
       figure={money(plan.committed)}
-      note={`${money(plan.remaining)} of ${money(income)} income remains after trimming ${money(plan.cut)} from bills and subscriptions. Minimum debt payments stay fixed.`}
+      note={`${money(plan.remaining)} of ${money(income)} income remains after trimming ${money(plan.cut)}. Subscriptions are reduced first, then recurring bills. Minimum debt payments stay fixed.`}
       sliders={
         <MoneySlider label="Bills you could trim" value={plan.cut} min={0} max={Math.floor(plan.maximumCut / 10) * 10} step={10} onChange={setCut} />
       }
@@ -320,7 +346,6 @@ function BillsView({ latest, history }: { latest: Snapshot; history: Snapshot[] 
         ["Recurring bills", money(plan.bills)],
         ["Subscriptions", money(plan.subscriptions)],
         ["Minimum debt", money(debt)],
-        ["Delays / overdrafts", `${num(latest.bill_payment_delay_count)} / ${num(latest.overdraft_count_90d)}`],
       ]}
     >
       <TrendChart

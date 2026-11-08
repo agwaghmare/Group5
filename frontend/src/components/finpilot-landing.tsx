@@ -15,19 +15,19 @@ const SECTIONS: {
   {
     name: "Home",
     title: "Your money, piloted.",
-    body: "One cockpit for everything you own, owe and plan.",
+    body: "Understand what you have, what you owe and what could happen next. Explore your financial picture, ask for plain-word explanations and choose a next step with more confidence.",
   },
   {
     name: "Wallet",
     title: "Level up your finances.",
-    body: "Milestones, rewards wallet, XP, achievements, and FinPilot Credits.",
+    body: "Build habits with milestones and rewards, practice test payments, or create a test currency of your own.",
     to: "/wallet",
     cta: "Open Wallet",
   },
   {
     name: "Finance",
     title: "See the whole runway.",
-    body: "Balances, bills, savings, and debt from the synthetic tracker for the account you signed in with.",
+    body: "See cash, bills, savings, debt and investments together. Explore health indicators and what-if sliders, then ask Amelia for a plain-word review of your synthetic tracker.",
     to: "/finance",
     cta: "Open Finance",
   },

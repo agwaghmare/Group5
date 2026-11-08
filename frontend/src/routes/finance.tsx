@@ -62,7 +62,7 @@ function FinancePage() {
             Make money make sense.
           </h1>
           <p className="mt-3 max-w-xl text-muted-foreground">
-            Monthly observations from the synthetic tracker for the account you signed in with. Amelia explains the verified numbers.
+            Bring your cash, bills, savings, debt and investments into one financial picture. Explore possible next steps with sliders and ask Amelia to explain them in plain words. This prototype uses your signed-in account's synthetic tracker.
           </p>
           <div className="mt-8 min-h-0 flex-1">
             <FinanceSection

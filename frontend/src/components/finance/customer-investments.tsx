@@ -18,6 +18,13 @@ function Control({ label, value, min = 0, max, step = 1, onChange, format = Stri
   </label>;
 }
 
+const INVESTMENT_GUIDE = {
+  overview: "See your recorded investment value and holdings. Adjust the starting amount, monthly contribution, time horizon and assumed return to explore how an investment plan could grow.",
+  risk: "See how your chosen mix changes modeled return, volatility and drawdown. Volatility means how widely values swing; drawdown means a fall from a previous high. Compare these with the risk budget for your profile.",
+  profile: "Describe your goal, how long you plan to invest, your comfort with risk and the cash you may need. The sliders let you explore how those choices affect the model's risk budget.",
+  rebalance: "Compare your recorded mix with a suggested balance of stocks, bonds and foreign investments. See the possible dollar shifts and preview the suggestion in the sliders before deciding what to discuss next.",
+};
+
 export function CustomerInvestments() {
   const session = useCustomerSession();
   const query = useQuery({ queryKey: ["customer-investments", session?.email, session?.token],
@@ -88,6 +95,7 @@ export function InvestmentWorkspace({ portfolio }: { portfolio: CustomerPortfoli
       </nav>
       <Button variant="ghost" onClick={reset}>Reset what-if</Button>
     </div>
+    <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground" aria-label="About this investment section">{INVESTMENT_GUIDE[tab]}</p>
     <p className="text-xs text-muted-foreground">Your account's modeled portfolio, as of {portfolio.as_of}. Sliders preview scenarios; they do not trade or change your saved profile.</p>
     {tab === "overview" && <>
       <div className="grid gap-4 sm:grid-cols-3">

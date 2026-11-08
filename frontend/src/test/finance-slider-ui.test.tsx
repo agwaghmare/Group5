@@ -59,12 +59,19 @@ describe("Finance slider wiring", () => {
 
   it("reconciles trimmed bills and subscriptions without changing history or debt", () => {
     render(<FinanceSection view="bills" onViewChange={vi.fn()} />);
-    change("Bills you could trim", 1100);
-    expect(card("Recurring bills")).toContain("$0");
+    change("Bills you could trim", 100);
+    expect(card("Recurring bills")).toContain("$1,000");
     expect(card("Subscriptions")).toContain("$100");
+    expect(chart()[1]).toMatchObject({ Bills: 1000, Subscriptions: 100, Debt: 100 });
+    change("Bills you could trim", 200);
+    expect(card("Recurring bills")).toContain("$1,000");
+    expect(card("Subscriptions")).toContain("$0");
+    change("Bills you could trim", 1100);
+    expect(card("Recurring bills")).toContain("$100");
+    expect(card("Subscriptions")).toContain("$0");
     expect(card("Minimum debt")).toContain("$100");
     expect(chart()[0]).toMatchObject({ Bills: 1000, Subscriptions: 200, Debt: 100 });
-    expect(chart()[1]).toMatchObject({ Bills: 0, Subscriptions: 100, Debt: 100 });
+    expect(chart()[1]).toMatchObject({ Bills: 100, Subscriptions: 0, Debt: 100 });
   });
 
   it("updates savings projections and recognizes an already-met goal at zero contribution", () => {

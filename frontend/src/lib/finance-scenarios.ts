@@ -31,8 +31,8 @@ export function trimmedBills(latest: Snapshot, requested: number) {
   const subscriptions = positive(latest.subscription_cost_monthly);
   const debt = positive(latest.minimum_debt_payment);
   const cut = cents(clamp(requested, 0, bills + subscriptions));
-  const adjustedBills = cents(Math.max(0, bills - cut));
-  const adjustedSubscriptions = cents(subscriptions - Math.max(0, cut - bills));
+  const adjustedSubscriptions = cents(Math.max(0, subscriptions - cut));
+  const adjustedBills = cents(Math.max(0, bills - Math.max(0, cut - subscriptions)));
   const committed = cents(adjustedBills + adjustedSubscriptions + debt);
   return { cut, bills: adjustedBills, subscriptions: adjustedSubscriptions, debt, committed,
     remaining: cents(number(latest.monthly_income) - committed), maximumCut: bills + subscriptions };

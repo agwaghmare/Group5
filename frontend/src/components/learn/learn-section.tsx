@@ -33,6 +33,12 @@ import {
 
 export type LearnView = "lessons" | "map" | "explain";
 
+const LEARN_GUIDE: Record<LearnView, string> = {
+  lessons: "Build confidence with short finance lessons, worked examples and quick knowledge checks. Explore linked readings and videos, ask Wilbur about unfamiliar ideas, and earn test PNC coins when you pass a lesson's quiz.",
+  map: "See how finance topics connect and which lessons build on earlier ones. Select a topic to find a useful next lesson, then open it when you are ready to learn more.",
+  explain: "Ask Wilbur to explain a finance term or help you understand your recorded financial numbers. For topics beyond the lessons, he can look up references and show source links. Type a question or use voice for a spoken explanation.",
+};
+
 /** The Learn tab (Wilbur). Two views, Lessons and Knowledge Map, plus Explain-this for the current decision. */
 export function LearnSection({
   view,
@@ -72,6 +78,8 @@ export function LearnSection({
           <MessageCircleQuestion aria-hidden="true" /> Explain this
         </TabsTrigger>
       </TabsList>
+
+      <p className="mb-6 max-w-3xl text-sm leading-relaxed text-muted-foreground" aria-label="About this learning section">{LEARN_GUIDE[view]}</p>
 
       <TabsContent value="lessons" className="min-h-0 flex-1">
         {lessonId ? (

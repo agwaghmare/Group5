@@ -59,11 +59,13 @@ describe("Finance scenario stress tests", () => {
       const bills = Number(row.recurring_bill_total);
       const subs = Number(row.subscription_cost_monthly);
       const debt = Number(row.minimum_debt_payment);
-      for (const cut of [0, 25, 650, 1225, 2000, bills, bills + subs, 1e9]) {
+      for (const cut of [0, 25, 650, 1225, 2000, Math.max(0, subs - .01), subs, subs + .01, bills, bills + subs, 1e9]) {
         const plan = trimmedBills(row, cut);
         close(plan.committed, plan.bills + plan.subscriptions + debt);
         close(plan.remaining + plan.committed, Number(row.monthly_income));
         close(plan.debt, debt);
+        if (cut <= subs) close(plan.bills, bills);
+        if (cut >= subs) close(plan.subscriptions, 0);
         if (plan.bills < -0.01 || plan.subscriptions < -0.01 || plan.committed < debt - 0.01) throw new Error("Trims reduced fixed debt");
       }
     }
