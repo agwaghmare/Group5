@@ -1,20 +1,19 @@
-"""Transactional demo store; optional PostgreSQL uses explicit migrations and RLS.
-
-SQLite deliberately provides API-only isolation. It is never presented as proof
-of the Tiger role policies. Configure STAFF_DATABASE_URL to use PostgreSQL.
-"""
+"""SQLAlchemy-backed employee persistence; authorization is enforced by the API."""
 import hashlib
 import json
-import os
 import secrets
-import sqlite3
 import threading
+from copy import deepcopy
 from datetime import datetime, timezone
-from pathlib import Path
 
-from app.settings import BACKEND
+from sqlalchemy import select, text
+from sqlalchemy.orm import Session
+
+from app.orm.bootstrap import seed_identities
+from app.orm.database import database_url, get_engine
+from app.orm.models import RECORD_MODELS, DataImport, Role
 from app.staff.policy import ALLOWED, POLICY
-from app.staff.registry import FEATURES, ROLES
+from app.staff.registry import FEATURES
 from app.staff.seed import catalog, employees, prospects
 
 TABLES = ("employees", "prospects", "credit_profiles", "protected", "links", "policies", "grants", "runs", "decisions",
@@ -42,7 +41,7 @@ def seed(store):
     for i, prospect in enumerate(prospects()):
         metadata = {k: prospect[k] for k in ("id", "product", "application_ref", "assigned_to", "synthetic", "as_of")}
         store.insert("prospects", metadata, prospect["assigned_to"])
-        store.insert("credit_profiles", {k: v for k, v in prospect.items() if k in (*ALLOWED, "id")}, prospect["assigned_to"])
+        store.insert("credit_profiles", {k: v for k, v in prospect.items() if k in (*ALLOWED, "id", "employment_months", "delinquencies_12m", "bankruptcy_years_ago")}, prospect["assigned_to"])
         store.insert("protected", {"id": prospect["id"], "group_label": "A" if i % 2 else "B"})
     store.insert("links", {"id": "conflict-demo", "employee_id": "E001", "prospect_id": "P005"}, "E001")
     store.insert("policies", POLICY)
@@ -61,104 +60,86 @@ def seed(store):
 
 
 class Store:
+    """SQLAlchemy transaction shared by identity, tracker and employee services."""
     def __init__(self):
-        self.url = os.environ.get("STAFF_DATABASE_URL", "").strip()
-        self.postgres = bool(self.url)
         self.employee = None
+        self.user = None
+        self.postgres = False  # Legacy branches are inactive; no Tiger functions run.
+        self.url = database_url()
 
     def __enter__(self):
-        if self.postgres:
+        with _INIT:
+            self.db = Session(get_engine(), expire_on_commit=False)
             try:
-                import psycopg
-            except ImportError as exc:
-                raise RuntimeError("Install backend requirements to enable PostgreSQL") from exc
-            self.conn = psycopg.connect(self.url)
-            privileged = self.conn.execute("SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname=current_user").fetchone()[0]
-            if privileged:
-                self.conn.close()
-                raise RuntimeError("Use a dedicated non-superuser runtime login without BYPASSRLS; never use tsdbadmin for the staff API")
-            owner = self.conn.execute("SELECT EXISTS(SELECT FROM pg_tables WHERE schemaname='staff_app' AND tableowner=current_user)").fetchone()[0]
-            if owner:
-                self.conn.close()
-                raise RuntimeError("The migration owner cannot be the staff API runtime login")
-            self.conn.execute("SET LOCAL ROLE finpilot_gateway")
-        else:
-            path = Path(os.environ.get("STAFF_SQLITE_PATH", BACKEND / "storage" / "staff.sqlite3"))
-            path.parent.mkdir(parents=True, exist_ok=True)
-            self.conn = sqlite3.connect(path, timeout=20)
-            self.conn.execute("PRAGMA foreign_keys=ON")
-            with _INIT:
-                for table in TABLES:
-                    self.conn.execute(f'CREATE TABLE IF NOT EXISTS "{table}" (id TEXT PRIMARY KEY, owner TEXT NOT NULL DEFAULT \'\', payload TEXT NOT NULL)')
-                for table in ("audit", "runs", "decisions", "case_events", "redemptions", "policies", "benefit_rules", "catalog"):
-                    for operation in ("UPDATE", "DELETE"):
-                        self.conn.execute(f'CREATE TRIGGER IF NOT EXISTS "immutable_{table}_{operation}" BEFORE {operation} ON "{table}" BEGIN SELECT RAISE(ABORT, \'append-only\'); END')
-                self.conn.commit()
-                self.conn.execute("BEGIN IMMEDIATE")
+                self.db.execute(text("BEGIN IMMEDIATE"))
                 seed(self)
-                self.conn.commit()
-            self.conn.execute("BEGIN IMMEDIATE")
+                if not self.db.get(Role, "customer") or not self.db.get(DataImport, "personal_finance_tracker_dataset.csv"):
+                    seed_identities(self.db)
+                self.db.commit()
+            except Exception:
+                self.db.rollback()
+                self.db.close()
+                raise
+        self.db.execute(text("BEGIN IMMEDIATE"))
         return self
 
     def __exit__(self, cls, error, tb):
-        # HTTP errors retain the denial audit. Routes validate before mutating.
         from fastapi import HTTPException
         try:
             if error is None or isinstance(error, HTTPException):
-                self.conn.commit()
+                self.db.commit()
             else:
-                self.conn.rollback()
+                self.db.rollback()
         finally:
-            self.conn.close()
+            self.db.close()
 
     def execute(self, query, args=()):
-        if not self.postgres:
-            query = query.replace("%s", "?")
-        return self.conn.execute(query, args)
+        # Internal compatibility for existing expiry/immutability tests, not an API.
+        if args:
+            return self.db.connection().exec_driver_sql(query.replace("%s", "?"), args)
+        return self.db.execute(text(query))
 
     def table(self, name):
-        if name not in TABLES:
+        if name not in RECORD_MODELS:
             raise ValueError("Unknown table")
-        if self.postgres and name == "runs" and self.employee and self.employee["role"] == "compliance_analyst":
-            return "staff_app.review_runs"
-        return f'staff_app."{name}"' if self.postgres else f'"{name}"'
+        return '"'+name+'"'
 
     def assume(self, employee):
         self.employee = employee
-        if self.postgres:
-            role = employee["role"]
-            if role not in ROLES:
-                raise ValueError("Unknown role")
-            self.conn.execute(f"SET LOCAL ROLE app_{role}")
-            self.conn.execute("SELECT set_config('app.employee_id', %s, true)", (employee["id"],))
-            # Serializes cap checks per employee, without locking other employees.
-            self.conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (employee["id"],))
 
     def all(self, table):
-        rows = self.execute(f"SELECT payload FROM {self.table(table)} ORDER BY id").fetchall()
-        return [r[0] if isinstance(r[0], dict) else json.loads(r[0]) for r in rows]
+        return [deepcopy(row.payload) for row in self.db.scalars(select(RECORD_MODELS[table]).order_by(RECORD_MODELS[table].id))]
 
     def get(self, table, key):
-        row = self.execute(f"SELECT payload FROM {self.table(table)} WHERE id=%s", (key,)).fetchone()
-        return (row[0] if isinstance(row[0], dict) else json.loads(row[0])) if row else None
+        row = self.db.get(RECORD_MODELS[table], key)
+        return deepcopy(row.payload) if row else None
 
     def insert(self, table, data, owner=""):
-        payload = json.dumps(data, allow_nan=False)
-        self.execute(f"INSERT INTO {self.table(table)} (id, owner, payload) VALUES (%s,%s,%s)", (data["id"], owner, payload))
+        json.dumps(data, allow_nan=False)
+        model = RECORD_MODELS[table]
+        fields = {col.name: data[col.name] for col in model.__table__.columns
+                  if col.name not in ("id", "owner", "payload") and col.name in data}
+        self.db.add(model(id=data["id"], owner=owner, payload=deepcopy(data), **fields))
+        self.db.flush()
         return data
 
     def update(self, table, data):
-        if table not in ("cases", "anomalies"):
+        if table not in ("cases", "anomalies", "grants", "sessions"):
             raise ValueError("This resource is append-only")
-        self.execute(f"UPDATE {self.table(table)} SET payload=%s WHERE id=%s", (json.dumps(data), data["id"]))
+        row = self.db.get(RECORD_MODELS[table], data["id"])
+        if row is None:
+            raise KeyError(data["id"])
+        row.payload = deepcopy(data)
+        for col in row.__table__.columns:
+            if col.name not in ("id", "owner", "payload") and col.name in data:
+                setattr(row, col.name, data[col.name])
+        self.db.flush()
         return data
 
     def audit(self, action, resource="", outcome="allowed", **details):
-        row = {"id": ident("AUD"), "ts": now(), "actor": (self.employee or {}).get("id", "anonymous"),
-               "role": (self.employee or {}).get("role", "anonymous"), "action": action,
-               "resource": resource, "outcome": outcome, **details}
-        if self.postgres:
-            self.conn.execute("SELECT staff_app.write_audit(%s::jsonb)", (json.dumps(row),))
-        else:
-            self.insert("audit", row)
+        row = {"id": ident("AUD"), "ts": now(),
+               "actor": (self.user.id if self.user else (self.employee or {}).get("id", "anonymous")),
+               "role": (self.user.role_key if self.user else (self.employee or {}).get("role", "anonymous")),
+               "action": action, "resource": resource, "outcome": outcome, **details}
+        self.insert("audit", row)
         return row

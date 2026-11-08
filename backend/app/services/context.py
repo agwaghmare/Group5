@@ -60,16 +60,20 @@ class DecisionContext:
         return False
 
 
-def load_context(customer_id: str | None = None, tracker_user_id: int | None = None) -> DecisionContext:
-    tables = _tables()
+def load_context(customer_id: str | None = None, tracker_user_id: int | None = None, session=None) -> DecisionContext:
     ctx = DecisionContext(customer_id=customer_id, tracker_user_id=tracker_user_id)
     if tracker_user_id is not None:
-        rows = [row for row in tables["tracker"] if int(float(row["user_id"])) == int(tracker_user_id)]
-        if rows:
-            ctx.tracker = max(rows, key=lambda row: row["date"])
-            ctx.notes.append("Tracker figures are synthetic.")
+        from sqlalchemy import select
+        from app.orm.access import snapshot_dict
+        from app.orm.models import FinanceSnapshot
+        if session is None:
+            raise ValueError("Personalized context requires an authorized ORM session")
+        row = session.scalar(select(FinanceSnapshot).where(FinanceSnapshot.user_id == tracker_user_id).order_by(FinanceSnapshot.date.desc()).limit(1))
+        if row:
+            ctx.tracker = {key: str(value) if value is not None else None for key, value in snapshot_dict(row).items()}
+            ctx.notes.append("Tracker figures are synthetic, loaded through SQLAlchemy.")
         else:
-            ctx.notes.append(f"No tracker rows were found for user {tracker_user_id}.")
+            ctx.notes.append("No tracker rows were found for your account.")
     return ctx
 
 

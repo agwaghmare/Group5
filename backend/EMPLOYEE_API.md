@@ -1,8 +1,9 @@
 # Employee backend handoff
 
-For the merged customer + employee database setup, see [TIGER_SETUP.md](TIGER_SETUP.md).
-Customer DATABASE_URL and employee STAFF_DATABASE_URL serve separate schemas and
-login paths; their tokens are not interchangeable.
+**Current storage:** SQLAlchemy + local SQLite. See [SQLALCHEMY_SETUP.md](SQLALCHEMY_SETUP.md)
+for the schema, email accounts, all-role views and verification. Customer and employee
+logins now use one User directory and the same opaque token format. Tiger and Lab
+Package instructions from earlier versions are retired.
 
 This is the PNC employee prototype from Skill.md. It extends the existing FastAPI
 server without changing any frontend files. All staff data and policy are synthetic.
@@ -28,9 +29,9 @@ shell environment variables take precedence. `.env` and other secret variants ar
 gitignored; `.env.example` is safe to share. Add your frontend origin to
 `CORS_ORIGINS` if it differs from localhost:8080.
 
-With no `STAFF_DATABASE_URL`, staff state persists in `storage/staff.sqlite3`.
-This local mode enforces permissions in the API only. It is not proof of database
-role isolation. `/staff/me` reports the active mode explicitly.
+All identity, tracker and employee state now persists through SQLAlchemy in
+`storage/finpilot_local.sqlite3`. Authorization uses server-side row/field scopes;
+SQLite has no database-user RLS. `/staff/me` reports `sqlalchemy_sqlite`.
 
 ## Frontend integration
 
@@ -185,37 +186,11 @@ Transitions are new → assigned/in_progress → resolved. Resolved cases cannot
 reopened by this API. Seeded handoffs are explicitly marked; Amelia-to-case creation
 is not wired yet. No live customer conversations are read.
 
-## Connect to Tiger later
+## SQLAlchemy storage
 
-The runtime defaults to SQLite so your friend can work without cloud credentials.
-No migration has been applied to your partner's database by this change.
-
-1. Put an administrative URL in local `STAFF_ADMIN_DATABASE_URL` and run
-   `python manage_staff.py init-db`. This explicitly creates only the additive
-   `staff_app` schema, synthetic seeds and application roles. It never reloads or
-   drops the PNC dataset. The command is transactional and records migration v1.
-2. Have the database administrator create a dedicated `LOGIN NOINHERIT` runtime
-   user (for example `finpilot_runtime`) and grant `finpilot_gateway` to it.
-   Set its password privately, e.g. with psql's `\password finpilot_runtime`.
-   Do not grant schema ownership, superuser or BYPASSRLS.
-3. Put that runtime user's connection URL in `STAFF_DATABASE_URL` and restart.
-   URL-encode reserved characters in passwords. Keep `sslmode=require` for Tiger.
-   Do not use `tsdbadmin` as the application runtime credential.
-4. The store assumes `finpilot_gateway` for session lookup, then sets the staff
-   database role and employee context locally inside each request transaction.
-   SQLite serializes requests for cap checks; PostgreSQL takes per-employee
-   transaction locks to prevent concurrent cap overruns.
-5. Verify the SQL isolation tests against a migrated **dedicated test database**
-   using its runtime URL in `STAFF_TEST_DATABASE_URL` before relying on the policies.
-
-The initial PostgreSQL implementation uses regular tables with forced RLS, not
-hypertables. Timescale compression/pooler compatibility has not been verified.
-The protected-label table has no grants to application roles; only the aggregate
-fairness function can read it. Compliance sees a masked research view; portfolio
-uses an aggregate-only function. Audit writes use a restricted append function;
-updates/deletes/truncation are blocked. Roles receive no access to existing
-`pnc` tables through these migrations. The existing PNC dataset is not connected
-to role-specific customer reads yet.
+Use `python manage_database.py init` and `python manage_database.py status`.
+No Tiger service or cloud migration is needed. All original tracker columns are
+in FinanceSnapshot; users have email and a role FK. See SQLALCHEMY_SETUP.md.
 
 ## Validation and remaining integration
 
@@ -227,10 +202,10 @@ python tests/test_learn_api.py
 The SQLite/API tests cover all seven roles, spoofed roles, grants, conflicts,
 expiry, break-glass, decision overrides, audit immutability, benefit caps/limits,
 idempotency, cases, policy boundaries, invalid evidence, mirror pairs, and mocks.
-Direct PostgreSQL tests skip unless `STAFF_TEST_DATABASE_URL` is supplied.
+Archived PostgreSQL tests are not part of the active local schema. New SQLAlchemy tests run against real temporary SQLite databases.
 
 Remaining work: frontend integration; live model adapters and orchestration;
-cloud migration and verified SQL isolation; consented Amelia handoff creation;
+frontend email/role-view integration; consented Amelia handoff creation;
 verified marketing-consent data; and a fraud detection feed. Portfolio currently uses the **500-user local tracker**,
 clearly labeled, rather than inventing the 30-customer cohort mentioned in Skill.md.
 No frontend assets, sponsor datasets, or Skill.md registry text were modified.

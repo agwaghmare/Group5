@@ -20,10 +20,11 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings, validate_production_settings
 from app.core.logging import configure_logging
-from app.pnc.api.auth_routes import router as auth_router
-from app.pnc.api.customer import router as customer_router
+from app.routers.identity import router as auth_router
 from app.routers.learn import router as learn_router
 from app.routers.staff import router as staff_router
+from app.routers.tracker import router as customer_router
+from app.routers.views import router as views_router
 from app.settings import load_env
 
 load_env()
@@ -34,7 +35,7 @@ log = logging.getLogger("finpilot.http")
 app = FastAPI(
     title="FinPilot PNC, Learn and Employee API",
     version="1.0.0",
-    summary="PNC-only financial intelligence backend: customer finance services, isolated per customer by PostgreSQL RLS.",
+    summary="SQLAlchemy users, roles and personal finance tracker; scoped customer and employee views.",
 )
 app.add_middleware(
     CORSMiddleware,
@@ -70,6 +71,7 @@ app.include_router(auth_router)
 app.include_router(customer_router)
 app.include_router(learn_router)
 app.include_router(staff_router)
+app.include_router(views_router)
 
 
 @app.get("/health")
@@ -79,9 +81,13 @@ def health() -> dict:
 
 @app.get("/health/db")
 def health_db() -> dict:
-    from app.core.db import ping
+    from sqlalchemy import func, select
+
+    from app.orm.models import FinanceSnapshot, User
+    from app.staff.store import Store
     try:
-        r = ping()
-        return {"status": "ok", "database_user": r["user"]}
+        with Store() as store:
+            return {"status": "ok", "database": "sqlalchemy_sqlite", "users": store.db.scalar(select(func.count()).select_from(User)),
+                    "financial_snapshots": store.db.scalar(select(func.count()).select_from(FinanceSnapshot))}
     except Exception as exc:
         return JSONResponse(status_code=503, content={"status": "unavailable", "error": exc.__class__.__name__})

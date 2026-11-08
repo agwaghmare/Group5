@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
+
+from app.orm.access import customer_scope
+from app.orm.identity import current_identity
+from app.staff.store import Store
 
 from app.content.curriculum import LESSON_INDEX, LESSONS, SCENARIO_INDEX, SCENARIOS, TOPICS, knowledge_map
 from app.examples import render_example
@@ -268,8 +272,8 @@ def mark_complete(user_id: str, lesson_id: str) -> dict:
 
 
 @router.get("/context/prompts")
-def context_prompts(customer_id: str | None = None, tracker_user_id: int | None = None) -> dict:
-    ctx = load_context(customer_id, tracker_user_id)
+def context_prompts(customer_id: str | None = None, tracker_user_id: int | None = None, authorization: str | None = Header(default=None)) -> dict:
+    ctx = authorized_context(customer_id, tracker_user_id, authorization)
     return {
         "customer_id": customer_id,
         "tracker_user_id": tracker_user_id,
@@ -279,7 +283,7 @@ def context_prompts(customer_id: str | None = None, tracker_user_id: int | None 
 
 
 @router.post("/context/explain")
-def context_explain(body: ExplainRequest) -> dict:
+def context_explain(body: ExplainRequest, authorization: str | None = Header(default=None)) -> dict:
     if not body.question and not body.question_id:
         raise HTTPException(status_code=400, detail="Send a question or a question_id")
     result = explain(
@@ -288,6 +292,7 @@ def context_explain(body: ExplainRequest) -> dict:
         body.customer_id,
         body.tracker_user_id,
         go_deeper=body.go_deeper,
+        context=authorized_context(body.customer_id, body.tracker_user_id, authorization),
     )
     if body.user_id and result.get("matched") and result.get("question_id"):
         record_view(body.user_id, result["question_id"])
@@ -295,6 +300,22 @@ def context_explain(body: ExplainRequest) -> dict:
 
 
 @router.post("/agent")
-def learning_agent(body: ExplainRequest) -> dict:
+def learning_agent(body: ExplainRequest, authorization: str | None = Header(default=None)) -> dict:
     """Learning agent: route a question through the Section 6 explanation sequence."""
-    return context_explain(body)
+    return context_explain(body, authorization)
+
+
+def authorized_context(customer_id, tracker_user_id, authorization):
+    if customer_id is None and tracker_user_id is None:
+        return load_context()
+    if not authorization:
+        raise HTTPException(401, "Sign in to use personal financial context")
+    with Store() as store:
+        current_identity(authorization, store)
+        requested = tracker_user_id if tracker_user_id is not None else customer_id
+        customer = customer_scope(store, requested)
+        if customer_id is not None and str(customer_id) != str(customer.tracker_id):
+            store.audit("learn_context_denied", str(customer_id), "denied")
+            raise HTTPException(403, "You may only use your own financial context")
+        store.audit("learn_context_read", str(customer.tracker_id))
+        return load_context(customer_id, customer.tracker_id, store.db)

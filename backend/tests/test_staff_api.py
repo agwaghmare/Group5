@@ -1,7 +1,6 @@
 """Run: python -m unittest discover -s tests -p 'test_staff*.py' -v"""
 import json
 import os
-import sqlite3
 import tempfile
 import unittest
 from datetime import date
@@ -9,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 
 from app.main import app
 from app.staff.policy import evaluate, validate_result
@@ -187,7 +187,7 @@ class StaffAPI(unittest.TestCase):
         self.run_research(h)
         with Store() as store:
             for table in ('audit','runs','policies','catalog','benefit_rules'):
-                with self.assertRaises(sqlite3.IntegrityError):
+                with self.assertRaises(IntegrityError):
                     store.execute(f'DELETE FROM "{table}"')
 
     def test_sessions_revoked_and_expired(self):

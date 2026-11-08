@@ -60,6 +60,9 @@ class SessionContext:
 @lru_cache(maxsize=1)
 def get_engine() -> Engine:
     settings = get_settings()
+    if get_database_url().startswith("sqlite:"):
+        from app.orm.database import get_engine as orm_engine
+        return orm_engine()
     return create_engine(
         get_database_url(),
         pool_size=settings.db_pool_size,
@@ -71,6 +74,8 @@ def get_engine() -> Engine:
 
 
 def _apply_context(conn: Connection, ctx: SessionContext) -> None:
+    if conn.dialect.name == "sqlite":
+        raise RuntimeError("Legacy PostgreSQL role queries are retired; use the scoped ORM services")
     # Role names cannot be bound as parameters; ctx.db_role is whitelisted in __post_init__.
     conn.execute(text(f"SET LOCAL ROLE {ctx.db_role}"))
     settings = {

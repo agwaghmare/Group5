@@ -12,7 +12,9 @@ os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
 
 def _db_available() -> bool:
     try:
-        from app.core.db import ping
+        from app.core.db import get_engine, ping
+        if get_engine().dialect.name != "postgresql":
+            return False  # Archived Lab Package/Tiger tests do not apply to the tracker ORM.
         ping()
         return True
     except Exception:
@@ -30,7 +32,7 @@ def pytest_collection_modifyitems(config, items):
         _AVAILABLE = _db_available()
     if _AVAILABLE:
         return
-    skip = pytest.mark.skip(reason="database not reachable (set DATABASE_URL or sign in with the tiger CLI)")
+    skip = pytest.mark.skip(reason="Legacy PostgreSQL/Lab Package integration; inactive in local tracker ORM mode")
     for i in items:
         if i.get_closest_marker("db"):
             i.add_marker(skip)
