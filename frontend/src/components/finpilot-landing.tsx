@@ -8,7 +8,7 @@ const SECTIONS: {
   name: string;
   title: string;
   body: string;
-  to?: "/learn";
+  to?: "/finance" | "/learn";
   cta?: string;
 }[] = [
   {
@@ -24,7 +24,9 @@ const SECTIONS: {
   {
     name: "Finance",
     title: "See the whole runway.",
-    body: "Budgets, savings and investments — charted clearly.",
+    body: "X-Ray your health indicators, cash flow, debt payoff paths, goals and purchase what-ifs — from your own PNC demo data.",
+    to: "/finance",
+    cta: "Open Finance",
   },
   {
     name: "Learn",

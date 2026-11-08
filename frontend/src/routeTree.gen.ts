@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as FinanceRouteImport } from './routes/finance'
 import { Route as LearnRouteImport } from './routes/learn'
 import { Route as PageFiveRouteImport } from './routes/page-five'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FinanceRoute = FinanceRouteImport.update({
+  id: '/finance',
+  path: '/finance',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LearnRoute = LearnRouteImport.update({
@@ -31,30 +37,34 @@ const PageFiveRoute = PageFiveRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/finance': typeof FinanceRoute
   '/learn': typeof LearnRoute
   '/page-five': typeof PageFiveRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/finance': typeof FinanceRoute
   '/learn': typeof LearnRoute
   '/page-five': typeof PageFiveRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/finance': typeof FinanceRoute
   '/learn': typeof LearnRoute
   '/page-five': typeof PageFiveRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/learn' | '/page-five'
+  fullPaths: '/' | '/finance' | '/learn' | '/page-five'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/learn' | '/page-five'
-  id: '__root__' | '/' | '/learn' | '/page-five'
+  to: '/' | '/finance' | '/learn' | '/page-five'
+  id: '__root__' | '/' | '/finance' | '/learn' | '/page-five'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  FinanceRoute: typeof FinanceRoute
   LearnRoute: typeof LearnRoute
   PageFiveRoute: typeof PageFiveRoute
 }
@@ -66,6 +76,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/finance': {
+      id: '/finance'
+      path: '/finance'
+      fullPath: '/finance'
+      preLoaderRoute: typeof FinanceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/learn': {
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  FinanceRoute: FinanceRoute,
   LearnRoute: LearnRoute,
   PageFiveRoute: PageFiveRoute,
 }
